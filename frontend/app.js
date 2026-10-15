@@ -88,6 +88,37 @@ document.addEventListener("DOMContentLoaded", () => {
   const downloadSpinner = document.getElementById("downloadSpinner");
   const downloadIcon = document.getElementById("downloadIcon");
 
+  // Step 8: Print-Ready 4x6 Layout Elements
+  const printLayoutCard = document.getElementById("printLayoutCard");
+  const btnOrientPortrait = document.getElementById("btnOrientPortrait");
+  const btnOrientLandscape = document.getElementById("btnOrientLandscape");
+  const printCopiesInput = document.getElementById("printCopiesInput");
+  const printCopiesVal = document.getElementById("printCopiesVal");
+  const btnCopiesMinus = document.getElementById("btnCopiesMinus");
+  const btnCopiesPlus = document.getElementById("btnCopiesPlus");
+  const btnMaxFit = document.getElementById("btnMaxFit");
+  const printBorderSlider = document.getElementById("printBorderSlider");
+  const printBorderVal = document.getElementById("printBorderVal");
+  const printSpacingSlider = document.getElementById("printSpacingSlider");
+  const printSpacingVal = document.getElementById("printSpacingVal");
+  const printMarginSlider = document.getElementById("printMarginSlider");
+  const printMarginVal = document.getElementById("printMarginVal");
+  const printGridLabel = document.getElementById("printGridLabel");
+  const printRatioLabel = document.getElementById("printRatioLabel");
+  const btnDownload4x6 = document.getElementById("btnDownload4x6");
+  const download4x6Spinner = document.getElementById("download4x6Spinner");
+  const download4x6BtnText = document.getElementById("download4x6BtnText");
+
+  // Print-Ready 4x6 Sheet Viewport Elements
+  const tabPrint = document.getElementById("tabPrint");
+  const printViewportContainer = document.getElementById("printViewportContainer");
+  const printSheetCanvasArea = document.getElementById("printSheetCanvasArea");
+  const printSheetPaperCard = document.getElementById("printSheetPaperCard");
+  const printSheetCanvas = document.getElementById("printSheetCanvas");
+  const sheetDimTag = document.getElementById("sheetDimTag");
+  const sheetPaperWatermark = document.getElementById("sheetPaperWatermark");
+  const btnSwitchToPassport = document.getElementById("btnSwitchToPassport");
+
   // Viewport & Live Passport Card Elements
   const emptyState = document.getElementById("emptyState");
   const dualPanelContainer = document.getElementById("dualPanelContainer");
@@ -187,6 +218,18 @@ document.addEventListener("DOMContentLoaded", () => {
       sharpening: 20,
       compareMode: false,
       splitCompare: false
+    },
+
+    // Step 8: Print-Ready 4x6 Layout State
+    printLayout: {
+      orientation: "portrait", // "portrait" (1200x1800) | "landscape" (1800x1200)
+      copies: 8,
+      borderPx: 2,
+      spacingPx: 20,
+      marginPx: 30,
+      maxFit: 8,
+      cols: 2,
+      rows: 4
     }
   };
 
@@ -316,6 +359,7 @@ document.addEventListener("DOMContentLoaded", () => {
       backgroundChoiceCard.classList.remove("hidden");
       if (faceEnhancementCard) faceEnhancementCard.classList.remove("hidden");
       exportCard.classList.remove("hidden");
+      if (printLayoutCard) printLayoutCard.classList.remove("hidden");
       cropOverlayWrapper.classList.remove("hidden");
 
       // Enable Download immediately with original background
@@ -760,6 +804,9 @@ document.addEventListener("DOMContentLoaded", () => {
     // Telemetry updates
     dbgPreviewRes.textContent = `${srcW} × ${srcH}`;
     dbgExportRes.textContent = `${srcW} × ${srcH} (Full Quality)`;
+
+    // Synchronize 4x6 print sheet composition with real-time passport photo updates
+    updatePrintSheetPreview();
   }
 
   function hexToRgba(hex, opacityPercent = 100) {
@@ -1479,6 +1526,323 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
+  // --- Step 8: Print-Ready 4x6 Layout Logic & Live Composition ---
+  function calculatePrintGrid(sheetW, sheetH, margin, spacing, aspect) {
+    let best = null;
+    for (let c = 1; c <= 5; c++) {
+      for (let r = 1; r <= 6; r++) {
+        const availW = sheetW - 2 * margin - (c - 1) * spacing;
+        const availH = sheetH - 2 * margin - (r - 1) * spacing;
+        if (availW <= 0 || availH <= 0) continue;
+
+        const slotW = availW / c;
+        const slotH = availH / r;
+
+        let photoW, photoH;
+        if (slotW / slotH > aspect) {
+          photoH = slotH;
+          photoW = photoH * aspect;
+        } else {
+          photoW = slotW;
+          photoH = photoW / aspect;
+        }
+
+        const count = c * r;
+        if (aspect >= 0.95 && count > 6) continue;
+        if (count > 8) continue;
+
+        if (!best || count > best.count || (count === best.count && (photoW * photoH) > (best.photoW * best.photoH))) {
+          best = {
+            cols: c,
+            rows: r,
+            count: count,
+            photoW: Math.round(photoW),
+            photoH: Math.round(photoH)
+          };
+        }
+      }
+    }
+    return best || { cols: 2, rows: 4, count: 8, photoW: 320, photoH: 411 };
+  }
+
+  function updatePrintSheetPreview() {
+    if (!printSheetCanvas) return;
+
+    const pl = memoryCache.printLayout;
+    const isPortrait = pl.orientation === "portrait";
+    const sheetW = isPortrait ? 1200 : 1800;
+    const sheetH = isPortrait ? 1800 : 1200;
+
+    // Buffer dimensions: exact 1200x1800 or 1800x1200 (True 300 DPI canvas)
+    if (printSheetCanvas.width !== sheetW || printSheetCanvas.height !== sheetH) {
+      printSheetCanvas.width = sheetW;
+      printSheetCanvas.height = sheetH;
+    }
+
+    const ctx = printSheetCanvas.getContext("2d");
+    // Crisp photo paper pure white background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, sheetW, sheetH);
+
+    // Compute grid
+    const aspect = memoryCache.activeRatioVal || (35.0 / 45.0);
+    const grid = calculatePrintGrid(sheetW, sheetH, pl.marginPx, pl.spacingPx, aspect);
+    pl.cols = grid.cols;
+    pl.rows = grid.rows;
+    pl.maxFit = grid.count;
+
+    // Clamp copies
+    if (pl.copies > pl.maxFit) pl.copies = pl.maxFit;
+    if (pl.copies < 1) pl.copies = 1;
+
+    // Update UI elements
+    if (printCopiesInput) printCopiesInput.value = pl.copies;
+    if (printCopiesVal) printCopiesVal.textContent = `${pl.copies} ${pl.copies === 1 ? "copy" : "copies"}`;
+    if (printGridLabel) printGridLabel.textContent = `${grid.cols} cols × ${grid.rows} rows (${grid.count} max fit)`;
+    if (printRatioLabel) printRatioLabel.textContent = `${memoryCache.activeRatioName} (Aspect Locked)`;
+    if (sheetDimTag) sheetDimTag.textContent = `${isPortrait ? "Portrait 4 × 6 in (1200 × 1800 px)" : "Landscape 6 × 4 in (1800 × 1200 px)"} • 300 DPI`;
+
+    // Scale printSheetPaperCard to strictly fit the available viewport with exact page aspect ratio (zero excess white area)
+    if (printSheetPaperCard) {
+      printSheetPaperCard.classList.toggle("landscape-sheet", !isPortrait);
+      const container = printSheetCanvasArea || printSheetPaperCard.parentElement;
+      if (container) {
+        const rect = container.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          const pad = 32;
+          const maxW = Math.max(100, rect.width - pad);
+          const maxH = Math.max(100, rect.height - pad);
+          const sheetAspect = isPortrait ? (4 / 6) : (6 / 4);
+
+          let targetW, targetH;
+          if (maxW / maxH > sheetAspect) {
+            targetH = maxH;
+            targetW = targetH * sheetAspect;
+          } else {
+            targetW = maxW;
+            targetH = targetW / sheetAspect;
+          }
+
+          printSheetPaperCard.style.width = `${Math.round(targetW)}px`;
+          printSheetPaperCard.style.height = `${Math.round(targetH)}px`;
+        }
+      }
+    }
+
+    // Centered grid coordinates
+    const totalW = grid.cols * grid.photoW + (grid.cols - 1) * pl.spacingPx;
+    const totalH = grid.rows * grid.photoH + (grid.rows - 1) * pl.spacingPx;
+    const startX = Math.round((sheetW - totalW) / 2);
+    const startY = Math.round((sheetH - totalH) / 2);
+
+    // Subtle sheet margin boundary line
+    ctx.save();
+    ctx.strokeStyle = "rgba(226, 232, 240, 0.7)";
+    ctx.lineWidth = 1;
+    ctx.strokeRect(pl.marginPx, pl.marginPx, sheetW - 2 * pl.marginPx, sheetH - 2 * pl.marginPx);
+    ctx.restore();
+
+    // Source photo: the live finalized passport canvas
+    const hasPhoto = passportPreviewCanvas && passportPreviewCanvas.width > 0 && memoryCache.currentFile;
+
+    // Draw slots
+    for (let idx = 0; idx < grid.count; idx++) {
+      const r = Math.floor(idx / grid.cols);
+      const c = idx % grid.cols;
+      const px = startX + c * (grid.photoW + pl.spacingPx);
+      const py = startY + r * (grid.photoH + pl.spacingPx);
+
+      if (idx < pl.copies) {
+        if (hasPhoto) {
+          ctx.drawImage(passportPreviewCanvas, px, py, grid.photoW, grid.photoH);
+        } else {
+          ctx.fillStyle = "#f1f5f9";
+          ctx.fillRect(px, py, grid.photoW, grid.photoH);
+        }
+
+        // Clean solid BLACK cutting border around every passport photo
+        if (pl.borderPx > 0) {
+          ctx.save();
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = pl.borderPx;
+          const halfB = pl.borderPx / 2;
+          ctx.strokeRect(px + halfB, py + halfB, grid.photoW - pl.borderPx, grid.photoH - pl.borderPx);
+          ctx.restore();
+        }
+      } else {
+        // Empty slot guide outline
+        ctx.save();
+        ctx.strokeStyle = "rgba(203, 213, 225, 0.6)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(px, py, grid.photoW, grid.photoH);
+        ctx.restore();
+      }
+    }
+  }
+
+  // --- Step 8 Controls Event Handlers ---
+  if (btnOrientPortrait) {
+    btnOrientPortrait.addEventListener("click", () => {
+      memoryCache.printLayout.orientation = "portrait";
+      btnOrientPortrait.classList.add("active");
+      if (btnOrientLandscape) btnOrientLandscape.classList.remove("active");
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (btnOrientLandscape) {
+    btnOrientLandscape.addEventListener("click", () => {
+      memoryCache.printLayout.orientation = "landscape";
+      btnOrientLandscape.classList.add("active");
+      if (btnOrientPortrait) btnOrientPortrait.classList.remove("active");
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (printCopiesInput) {
+    printCopiesInput.addEventListener("input", (e) => {
+      let val = parseInt(e.target.value, 10);
+      if (isNaN(val)) val = 1;
+      val = Math.max(1, Math.min(val, memoryCache.printLayout.maxFit));
+      memoryCache.printLayout.copies = val;
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (btnCopiesMinus) {
+    btnCopiesMinus.addEventListener("click", () => {
+      if (memoryCache.printLayout.copies > 1) {
+        memoryCache.printLayout.copies--;
+        updatePrintSheetPreview();
+      }
+    });
+  }
+
+  if (btnCopiesPlus) {
+    btnCopiesPlus.addEventListener("click", () => {
+      if (memoryCache.printLayout.copies < memoryCache.printLayout.maxFit) {
+        memoryCache.printLayout.copies++;
+        updatePrintSheetPreview();
+      }
+    });
+  }
+
+  if (btnMaxFit) {
+    btnMaxFit.addEventListener("click", () => {
+      memoryCache.printLayout.copies = memoryCache.printLayout.maxFit;
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (printBorderSlider) {
+    printBorderSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.printLayout.borderPx = val;
+      if (printBorderVal) printBorderVal.textContent = `${val} px`;
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (printSpacingSlider) {
+    printSpacingSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.printLayout.spacingPx = val;
+      if (printSpacingVal) printSpacingVal.textContent = `${val} px`;
+      updatePrintSheetPreview();
+    });
+  }
+
+  if (printMarginSlider) {
+    printMarginSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.printLayout.marginPx = val;
+      if (printMarginVal) printMarginVal.textContent = `${val} px`;
+      updatePrintSheetPreview();
+    });
+  }
+
+  // Download 4x6 Sheet Button Handler
+  if (btnDownload4x6) {
+    btnDownload4x6.addEventListener("click", async () => {
+      if (!memoryCache.sessionId && (!passportPreviewCanvas || passportPreviewCanvas.width === 0)) return;
+
+      btnDownload4x6.classList.add("disabled");
+      if (download4x6Spinner) download4x6Spinner.classList.remove("hidden");
+      if (download4x6BtnText) download4x6BtnText.textContent = "Compositing 300 DPI Sheet...";
+
+      const pl = memoryCache.printLayout;
+      const cn = memoryCache.cropNorm;
+
+      // Try server high-res 300 DPI export
+      if (memoryCache.sessionId) {
+        try {
+          const formData = new FormData();
+          formData.append("session_id", memoryCache.sessionId);
+          formData.append("copies", pl.copies);
+          formData.append("orientation", pl.orientation);
+          formData.append("border_px", pl.borderPx);
+          formData.append("spacing_px", pl.spacingPx);
+          formData.append("margin_px", pl.marginPx);
+          formData.append("bg_type", memoryCache.bgMode === "original" ? "original" : memoryCache.activeBgChoice);
+          if (memoryCache.bgMode === "remove" && memoryCache.activeBgChoice === "custom") {
+            const opacityHex = Math.round((memoryCache.activeCustomOpacity / 100) * 255)
+              .toString(16)
+              .padStart(2, "0");
+            formData.append("custom_color", memoryCache.activeCustomColor + opacityHex);
+          }
+          formData.append("crop_x_norm", cn.x);
+          formData.append("crop_y_norm", cn.y);
+          formData.append("crop_w_norm", cn.w);
+          formData.append("crop_h_norm", cn.h);
+          if (memoryCache.bgMode === "remove" && memoryCache.maskEdited && memoryCache.subjectCanvas) {
+            const maskUrl = getMaskDataUrl(memoryCache.subjectCanvas);
+            if (maskUrl) formData.append("edited_mask", maskUrl);
+          }
+
+          const resp = await fetch("/api/photo/export-4x6", {
+            method: "POST",
+            body: formData,
+          });
+          const data = await resp.json();
+          if (resp.ok && data.download_url) {
+            const tempLink = document.createElement("a");
+            tempLink.href = data.download_url;
+            tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
+            document.body.appendChild(tempLink);
+            tempLink.click();
+            document.body.removeChild(tempLink);
+            return;
+          }
+        } catch (serverErr) {
+          console.warn("Server 4x6 export failed, falling back to client 300 DPI canvas export:", serverErr);
+        }
+      }
+
+      // Fast, pristine client-side 300 DPI canvas export fallback
+      try {
+        updatePrintSheetPreview();
+        printSheetCanvas.toBlob((blob) => {
+          if (!blob) throw new Error("Canvas export failed");
+          const url = URL.createObjectURL(blob);
+          const tempLink = document.createElement("a");
+          tempLink.href = url;
+          tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
+          document.body.appendChild(tempLink);
+          tempLink.click();
+          document.body.removeChild(tempLink);
+          URL.revokeObjectURL(url);
+        }, "image/png");
+      } catch (clientErr) {
+        showError(clientErr.message || "Failed to export 4x6 print sheet.");
+      } finally {
+        btnDownload4x6.classList.remove("disabled");
+        if (download4x6Spinner) download4x6Spinner.classList.add("hidden");
+        if (download4x6BtnText) download4x6BtnText.textContent = "Download 4×6 Print Sheet (300 DPI)";
+      }
+    });
+  }
+
   // --- Render Face Overlay Boxes on Original Image ---
   function updateFaceOverlays() {
     faceOverlaysContainer.innerHTML = "";
@@ -1539,27 +1903,40 @@ document.addEventListener("DOMContentLoaded", () => {
   tabOriginal.addEventListener("click", () => setViewMode("original"));
   tabProcessed.addEventListener("click", () => setViewMode("processed"));
   tabSplit.addEventListener("click", () => setViewMode("split"));
+  if (tabPrint) tabPrint.addEventListener("click", () => setViewMode("print"));
+  if (btnSwitchToPassport) btnSwitchToPassport.addEventListener("click", () => setViewMode("processed"));
 
   function setViewMode(mode) {
     memoryCache.currentViewMode = mode;
-    [tabOriginal, tabProcessed, tabSplit].forEach((b) => b.classList.remove("active"));
+    [tabOriginal, tabProcessed, tabSplit, tabPrint].forEach((b) => b && b.classList.remove("active"));
     dualPanelContainer.classList.remove("single-mode-original", "single-mode-processed");
 
-    if (mode === "original") {
-      tabOriginal.classList.add("active");
-      dualPanelContainer.classList.add("single-mode-original");
-    } else if (mode === "processed") {
-      tabProcessed.classList.add("active");
-      dualPanelContainer.classList.add("single-mode-processed");
+    if (mode === "print") {
+      if (tabPrint) tabPrint.classList.add("active");
+      dualPanelContainer.classList.add("hidden");
+      if (printViewportContainer) printViewportContainer.classList.remove("hidden");
+      updatePrintSheetPreview();
+      setTimeout(updatePrintSheetPreview, 40);
     } else {
-      tabSplit.classList.add("active");
-    }
+      dualPanelContainer.classList.remove("hidden");
+      if (printViewportContainer) printViewportContainer.classList.add("hidden");
 
-    setTimeout(() => {
-      updateCropBoxDOM();
-      updateFaceOverlays();
-      updateLivePassportPreview();
-    }, 40);
+      if (mode === "original") {
+        tabOriginal.classList.add("active");
+        dualPanelContainer.classList.add("single-mode-original");
+      } else if (mode === "processed") {
+        tabProcessed.classList.add("active");
+        dualPanelContainer.classList.add("single-mode-processed");
+      } else {
+        tabSplit.classList.add("active");
+      }
+
+      setTimeout(() => {
+        updateCropBoxDOM();
+        updateFaceOverlays();
+        updateLivePassportPreview();
+      }, 40);
+    }
   }
 
   // --- Reset Entire Workspace ---
@@ -1591,9 +1968,38 @@ document.addEventListener("DOMContentLoaded", () => {
     backgroundChoiceCard.classList.add("hidden");
     if (faceEnhancementCard) faceEnhancementCard.classList.add("hidden");
     exportCard.classList.add("hidden");
+    if (printLayoutCard) printLayoutCard.classList.add("hidden");
+    if (printViewportContainer) printViewportContainer.classList.add("hidden");
     methodBanner.classList.add("hidden");
     debugCard.classList.add("hidden");
     downloadBtn.classList.add("disabled");
+
+    // Reset 4x6 print layout state
+    if (tabPrint) tabPrint.classList.remove("active");
+    if (btnOrientPortrait) btnOrientPortrait.classList.add("active");
+    if (btnOrientLandscape) btnOrientLandscape.classList.remove("active");
+    if (printBorderSlider) printBorderSlider.value = 2;
+    if (printBorderVal) printBorderVal.textContent = "2 px";
+    if (printSpacingSlider) printSpacingSlider.value = 20;
+    if (printSpacingVal) printSpacingVal.textContent = "20 px";
+    if (printMarginSlider) printMarginSlider.value = 30;
+    if (printMarginVal) printMarginVal.textContent = "30 px";
+    if (printCopiesInput) printCopiesInput.value = 8;
+    if (printCopiesVal) printCopiesVal.textContent = "8 copies";
+    if (printSheetCanvas) {
+      const pctx = printSheetCanvas.getContext("2d");
+      pctx.clearRect(0, 0, printSheetCanvas.width, printSheetCanvas.height);
+    }
+    memoryCache.printLayout = {
+      orientation: "portrait",
+      copies: 8,
+      borderPx: 2,
+      spacingPx: 20,
+      marginPx: 30,
+      maxFit: 8,
+      cols: 2,
+      rows: 4
+    };
 
     // Reset enhancement state
     if (toggleEnhancement) toggleEnhancement.checked = false;

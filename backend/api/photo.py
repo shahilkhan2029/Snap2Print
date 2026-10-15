@@ -5,7 +5,7 @@ import time
 import uuid
 import logging
 from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Tuple
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, FileResponse
 from PIL import Image
@@ -606,28 +606,22 @@ async def process_background(
     )
 
 
-@router.post("/export-final")
-async def export_final(
-    session_id: str = Form(...),
-    bg_type: str = Form("original"),
-    custom_color: Optional[str] = Form(None),
-    crop_x_norm: Optional[float] = Form(None),
-    crop_y_norm: Optional[float] = Form(None),
-    crop_w_norm: Optional[float] = Form(None),
-    crop_h_norm: Optional[float] = Form(None),
-    edited_mask: Optional[str] = Form(None)
-):
+def get_final_passport_image(
+    session_id: str,
+    bg_type: str = "original",
+    custom_color: Optional[str] = None,
+    crop_x_norm: Optional[float] = None,
+    crop_y_norm: Optional[float] = None,
+    crop_w_norm: Optional[float] = None,
+    crop_h_norm: Optional[float] = None,
+    edited_mask: Optional[str] = None
+) -> Tuple[Image.Image, str]:
     """
-    FULL-RESOLUTION EXPORT (Triggered ONLY when user clicks 'Download Image')
-    Composites stored 100% full-resolution cropped passport image.
-    If bg_type == 'original': exports cropped portrait with untouched original camera background.
-    If bg_type != 'original': composites cropped subject with studio background color.
-    Zero AI re-run. Fast alpha blending at native camera resolution.
+    Helper to composite or crop the 100% full-resolution passport photo.
+    Returns (final_pil_image, filename_suffix).
     """
-    t0 = time.time()
     session = SESSION_CACHE.get(session_id)
     if not session:
-        # Fallback check on disk: check for cropped first, then full
         cropped_p = INPUT_DIR / f"{session_id}_cropped.png"
         cropped_m = OUTPUT_DIR / f"{session_id}_cropped_mask.png"
         if cropped_p.exists() and cropped_m.exists():
@@ -648,123 +642,175 @@ async def export_final(
             else:
                 raise HTTPException(status_code=404, detail="Session expired or not found. Please re-upload.")
 
-    try:
-        from PIL import ImageOps
-        bg_choice_str = str(bg_type) if not hasattr(bg_type, "default") else "original"
+    from PIL import ImageOps
+    bg_choice_str = str(bg_type) if not hasattr(bg_type, "default") else "original"
 
-        # Case A: Keep Original Background (Zero AI segmentation needed!)
-        if bg_choice_str == "original":
-            if "original_path" in session and Path(session["original_path"]).exists():
-                orig_img = Image.open(session["original_path"])
-                orig_img = ImageOps.exif_transpose(orig_img)
-                orig_w, orig_h = orig_img.size
+    # Case A: Keep Original Background
+    if bg_choice_str == "original":
+        if "original_path" in session and Path(session["original_path"]).exists():
+            orig_img = Image.open(session["original_path"])
+            orig_img = ImageOps.exif_transpose(orig_img)
+            orig_w, orig_h = orig_img.size
 
-                try:
-                    has_norm = (
-                        crop_x_norm is not None and not hasattr(crop_x_norm, "default") and
-                        crop_y_norm is not None and not hasattr(crop_y_norm, "default") and
-                        crop_w_norm is not None and not hasattr(crop_w_norm, "default") and
-                        crop_h_norm is not None and not hasattr(crop_h_norm, "default")
-                    )
-                except Exception:
-                    has_norm = False
+            try:
+                has_norm = (
+                    crop_x_norm is not None and not hasattr(crop_x_norm, "default") and
+                    crop_y_norm is not None and not hasattr(crop_y_norm, "default") and
+                    crop_w_norm is not None and not hasattr(crop_w_norm, "default") and
+                    crop_h_norm is not None and not hasattr(crop_h_norm, "default")
+                )
+            except Exception:
+                has_norm = False
 
-                if has_norm:
-                    cx = max(0, min(int(round(float(crop_x_norm) * orig_w)), orig_w - 10))
-                    cy = max(0, min(int(round(float(crop_y_norm) * orig_h)), orig_h - 10))
-                    cw = max(10, min(int(round(float(crop_w_norm) * orig_w)), orig_w - cx))
-                    ch = max(10, min(int(round(float(crop_h_norm) * orig_h)), orig_h - cy))
-                    final_img = orig_img.crop((cx, cy, cx + cw, cy + ch))
-                elif "cropped_path" in session and Path(session["cropped_path"]).exists():
-                    final_img = Image.open(session["cropped_path"])
-                    final_img = ImageOps.exif_transpose(final_img)
-                elif "crop_box" in session:
-                    cb = session["crop_box"]
-                    final_img = orig_img.crop((cb["x"], cb["y"], cb["x"] + cb["width"], cb["y"] + cb["height"]))
-                else:
-                    final_img = orig_img
+            if has_norm:
+                cx = max(0, min(int(round(float(crop_x_norm) * orig_w)), orig_w - 10))
+                cy = max(0, min(int(round(float(crop_y_norm) * orig_h)), orig_h - 10))
+                cw = max(10, min(int(round(float(crop_w_norm) * orig_w)), orig_w - cx))
+                ch = max(10, min(int(round(float(crop_h_norm) * orig_h)), orig_h - cy))
+                final_img = orig_img.crop((cx, cy, cx + cw, cy + ch))
             elif "cropped_path" in session and Path(session["cropped_path"]).exists():
                 final_img = Image.open(session["cropped_path"])
                 final_img = ImageOps.exif_transpose(final_img)
+            elif "crop_box" in session:
+                cb = session["crop_box"]
+                final_img = orig_img.crop((cb["x"], cb["y"], cb["x"] + cb["width"], cb["y"] + cb["height"]))
             else:
-                raise HTTPException(status_code=404, detail="Original photo not found on disk.")
+                final_img = orig_img
+        elif "cropped_path" in session and Path(session["cropped_path"]).exists():
+            final_img = Image.open(session["cropped_path"])
+            final_img = ImageOps.exif_transpose(final_img)
+        else:
+            raise HTTPException(status_code=404, detail="Original photo not found on disk.")
 
-            output_filename = f"{session_id}_passport_original.png"
-            output_filepath = OUTPUT_DIR / output_filename
-            final_img.save(output_filepath, format="PNG", optimize=True)
+        return final_img, "passport_original"
 
-            export_time_ms = int((time.time() - t0) * 1000)
-            logger.info(f"Full-res original-bg export for {session_id} generated in {export_time_ms} ms ({final_img.size[0]}x{final_img.size[1]})")
+    # Case B: Studio Background Replacement
+    is_cropped = "cropped_path" in session and Path(session["cropped_path"]).exists() and "cropped_mask_path" in session and Path(session["cropped_mask_path"]).exists()
+    
+    if is_cropped:
+        src_img = Image.open(session["cropped_path"])
+        src_img = ImageOps.exif_transpose(src_img)
+        src_mask = Image.open(session["cropped_mask_path"]).convert("L")
+        export_prefix = "passport"
+    else:
+        if "mask_path" not in session or not session["mask_path"] or not Path(session["mask_path"]).exists():
+            raise HTTPException(status_code=400, detail="Background removal has not been run yet. Please choose 'Remove Background' first.")
+        src_img = Image.open(session["original_path"])
+        src_img = ImageOps.exif_transpose(src_img)
+        src_mask = Image.open(session["mask_path"]).convert("L")
+        export_prefix = "export"
 
-            del final_img
-            gc.collect()
+    # Apply manual eraser edited mask if user refined the mask in studio
+    if isinstance(edited_mask, str) and edited_mask.startswith("data:"):
+        try:
+            header, encoded = edited_mask.split(",", 1)
+            mask_bytes = base64.b64decode(encoded)
+            edited_pil = Image.open(io.BytesIO(mask_bytes)).convert("L")
+            if edited_pil.size != src_img.size:
+                src_mask = edited_pil.resize(src_img.size, Image.Resampling.BILINEAR)
+            else:
+                src_mask = edited_pil
+            logger.info(f"Manual eraser mask applied to export ({src_mask.size[0]}x{src_mask.size[1]})")
+        except Exception as e:
+            logger.warning(f"Failed to decode edited mask, using original AI mask: {e}")
 
-            return JSONResponse(
-                content={
-                    "success": True,
-                    "session_id": session_id,
-                    "export_time_ms": export_time_ms,
-                    "download_url": f"/api/photo/download/{output_filename}"
+    # Neutralize green/blue spill on full-res export if detected
+    bg_analysis = session.get("bg_analysis", {})
+    if bg_analysis.get("detected_color") in ("green", "blue"):
+        from backend.services.chroma_key import suppress_chroma_spill
+        src_rgb_np = np.array(src_img.convert("RGB"))
+        mask_np = np.array(src_mask)
+        despilled = suppress_chroma_spill(src_rgb_np, mask_np, bg_analysis["estimated_color_rgb"])
+        src_rgba = Image.fromarray(despilled).convert("RGBA")
+    else:
+        src_rgba = src_img.convert("RGBA")
+
+    src_rgba.putalpha(src_mask)
+
+    # Composite background
+    import importlib
+    import backend.services.image_compositor as img_comp
+    importlib.reload(img_comp)
+    final_img = img_comp.composite_studio_background(src_rgba, bg_type=bg_choice_str, custom_hex=custom_color)
+
+    return final_img, f"{export_prefix}_{bg_choice_str}"
+
+
+def compute_4x6_grid(sheet_w: int, sheet_h: int, margin: int, spacing: int, aspect: float) -> dict:
+    """
+    Calculates the optimal cols x rows packing that preserves aspect ratio,
+    respects margins and spacing, and fits on the 4x6 sheet.
+    """
+    best = None
+    for c in range(1, 6):
+        for r in range(1, 7):
+            avail_w = sheet_w - 2 * margin - (c - 1) * spacing
+            avail_h = sheet_h - 2 * margin - (r - 1) * spacing
+            if avail_w <= 0 or avail_h <= 0:
+                continue
+            slot_w = avail_w / c
+            slot_h = avail_h / r
+            if slot_w / slot_h > aspect:
+                photo_h = slot_h
+                photo_w = photo_h * aspect
+            else:
+                photo_w = slot_w
+                photo_h = photo_w / aspect
+            count = c * r
+            if aspect >= 0.95 and count > 6:
+                continue
+            if count > 8:
+                continue
+            if not best or count > best["count"] or (count == best["count"] and (photo_w * photo_h) > (best["photo_w"] * best["photo_h"])):
+                best = {
+                    "cols": c,
+                    "rows": r,
+                    "count": count,
+                    "photo_w": int(round(photo_w)),
+                    "photo_h": int(round(photo_h))
                 }
-            )
+    return best or {"cols": 2, "rows": 4, "count": 8, "photo_w": 320, "photo_h": 411}
 
-        # Case B: Studio Background Replacement (White, Blue, Transparent, Custom)
-        is_cropped = "cropped_path" in session and Path(session["cropped_path"]).exists() and "cropped_mask_path" in session and Path(session["cropped_mask_path"]).exists()
-        
-        if is_cropped:
-            src_img = Image.open(session["cropped_path"])
-            src_img = ImageOps.exif_transpose(src_img)
-            src_mask = Image.open(session["cropped_mask_path"]).convert("L")
-            export_prefix = "passport"
-        else:
-            if "mask_path" not in session or not session["mask_path"] or not Path(session["mask_path"]).exists():
-                raise HTTPException(status_code=400, detail="Background removal has not been run yet. Please choose 'Remove Background' first.")
-            src_img = Image.open(session["original_path"])
-            src_img = ImageOps.exif_transpose(src_img)
-            src_mask = Image.open(session["mask_path"]).convert("L")
-            export_prefix = "export"
 
-        # Apply manual eraser edited mask if user refined the mask in studio
-        if isinstance(edited_mask, str) and edited_mask.startswith("data:"):
-            try:
-                header, encoded = edited_mask.split(",", 1)
-                mask_bytes = base64.b64decode(encoded)
-                edited_pil = Image.open(io.BytesIO(mask_bytes)).convert("L")
-                if edited_pil.size != src_img.size:
-                    src_mask = edited_pil.resize(src_img.size, Image.Resampling.BILINEAR)
-                else:
-                    src_mask = edited_pil
-                logger.info(f"Manual eraser mask applied to export ({src_mask.size[0]}x{src_mask.size[1]})")
-            except Exception as e:
-                logger.warning(f"Failed to decode edited mask, using original AI mask: {e}")
+@router.post("/export-final")
+async def export_final(
+    session_id: str = Form(...),
+    bg_type: str = Form("original"),
+    custom_color: Optional[str] = Form(None),
+    crop_x_norm: Optional[float] = Form(None),
+    crop_y_norm: Optional[float] = Form(None),
+    crop_w_norm: Optional[float] = Form(None),
+    crop_h_norm: Optional[float] = Form(None),
+    edited_mask: Optional[str] = Form(None)
+):
+    """
+    FULL-RESOLUTION EXPORT (Triggered ONLY when user clicks 'Download Image')
+    Composites stored 100% full-resolution cropped passport image.
+    If bg_type == 'original': exports cropped portrait with untouched original camera background.
+    If bg_type != 'original': composites cropped subject with studio background color.
+    Zero AI re-run. Fast alpha blending at native camera resolution.
+    """
+    t0 = time.time()
+    try:
+        final_img, suffix = get_final_passport_image(
+            session_id=session_id,
+            bg_type=bg_type,
+            custom_color=custom_color,
+            crop_x_norm=crop_x_norm,
+            crop_y_norm=crop_y_norm,
+            crop_w_norm=crop_w_norm,
+            crop_h_norm=crop_h_norm,
+            edited_mask=edited_mask
+        )
 
-        # Neutralize green/blue spill on full-res export if detected
-        bg_analysis = session.get("bg_analysis", {})
-        if bg_analysis.get("detected_color") in ("green", "blue"):
-            from backend.services.chroma_key import suppress_chroma_spill
-            src_rgb_np = np.array(src_img.convert("RGB"))
-            mask_np = np.array(src_mask)
-            despilled = suppress_chroma_spill(src_rgb_np, mask_np, bg_analysis["estimated_color_rgb"])
-            src_rgba = Image.fromarray(despilled).convert("RGBA")
-        else:
-            src_rgba = src_img.convert("RGBA")
-
-        src_rgba.putalpha(src_mask)
-
-        # Composite background
-        import importlib
-        import backend.services.image_compositor as img_comp
-        importlib.reload(img_comp)
-        final_img = img_comp.composite_studio_background(src_rgba, bg_type=bg_choice_str, custom_hex=custom_color)
-
-        output_filename = f"{session_id}_{export_prefix}_{bg_choice_str}.png"
+        output_filename = f"{session_id}_{suffix}.png"
         output_filepath = OUTPUT_DIR / output_filename
         final_img.save(output_filepath, format="PNG", optimize=True)
 
         export_time_ms = int((time.time() - t0) * 1000)
         logger.info(f"Full-res export for {session_id} generated in {export_time_ms} ms ({final_img.size[0]}x{final_img.size[1]})")
 
-        del src_img, src_mask, final_img
+        del final_img
         gc.collect()
 
         return JSONResponse(
@@ -777,6 +823,115 @@ async def export_final(
         )
     except Exception as e:
         logger.error(f"Full-res export failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/export-4x6")
+async def export_4x6(
+    session_id: str = Form(...),
+    copies: int = Form(8),
+    orientation: str = Form("portrait"),
+    border_px: int = Form(2),
+    spacing_px: int = Form(20),
+    margin_px: int = Form(30),
+    bg_type: str = Form("original"),
+    custom_color: Optional[str] = Form(None),
+    crop_x_norm: Optional[float] = Form(None),
+    crop_y_norm: Optional[float] = Form(None),
+    crop_w_norm: Optional[float] = Form(None),
+    crop_h_norm: Optional[float] = Form(None),
+    edited_mask: Optional[str] = Form(None)
+):
+    """
+    PRINT-READY 4x6 INCH SHEET EXPORT (300 DPI):
+    Arranges multiple copies of the finalized passport photo onto an exact 4x6 inch canvas
+    (1200 x 1800 px in portrait, or 1800 x 1200 px in landscape).
+    Preserves exact aspect ratio, applies clean black border around every photo,
+    maintains equal spacing and balanced margins.
+    Saves with DPI=(300, 300) metadata for physical photo lab printing.
+    """
+    t0 = time.time()
+    try:
+        final_img, suffix = get_final_passport_image(
+            session_id=session_id,
+            bg_type=bg_type,
+            custom_color=custom_color,
+            crop_x_norm=crop_x_norm,
+            crop_y_norm=crop_y_norm,
+            crop_w_norm=crop_w_norm,
+            crop_h_norm=crop_h_norm,
+            edited_mask=edited_mask
+        )
+
+        is_portrait = orientation.lower() != "landscape"
+        sheet_w, sheet_h = (1200, 1800) if is_portrait else (1800, 1200)
+
+        # Aspect ratio of passport photo
+        orig_pw, orig_ph = final_img.size
+        aspect = float(orig_pw) / float(orig_ph) if orig_ph > 0 else (35.0 / 45.0)
+
+        grid = compute_4x6_grid(sheet_w, sheet_h, margin=margin_px, spacing=spacing_px, aspect=aspect)
+        cols = grid["cols"]
+        rows = grid["rows"]
+        pw = grid["photo_w"]
+        ph = grid["photo_h"]
+
+        total_w = cols * pw + (cols - 1) * spacing_px
+        total_h = rows * ph + (rows - 1) * spacing_px
+        start_x = (sheet_w - total_w) // 2
+        start_y = (sheet_h - total_h) // 2
+
+        # High quality LANCZOS resize of passport photo
+        resized_photo = final_img.convert("RGB").resize((pw, ph), Image.Resampling.LANCZOS)
+
+        # Draw solid black border around the photo perimeter
+        if border_px > 0:
+            from PIL import ImageDraw
+            draw = ImageDraw.Draw(resized_photo)
+            for b in range(border_px):
+                draw.rectangle([b, b, pw - 1 - b, ph - 1 - b], outline=(0, 0, 0))
+
+        # Create 300 DPI white photo paper sheet
+        sheet = Image.new("RGB", (sheet_w, sheet_h), (255, 255, 255))
+
+        num_copies = max(1, min(copies, grid["count"]))
+        for idx in range(num_copies):
+            r = idx // cols
+            c = idx % cols
+            pos_x = start_x + c * (pw + spacing_px)
+            pos_y = start_y + r * (ph + spacing_px)
+            sheet.paste(resized_photo, (pos_x, pos_y))
+
+        orient_tag = "portrait" if is_portrait else "landscape"
+        output_filename = f"{session_id}_sheet_4x6_{orient_tag}.png"
+        output_filepath = OUTPUT_DIR / output_filename
+        sheet.save(output_filepath, format="PNG", dpi=(300, 300), optimize=True)
+
+        export_time_ms = int((time.time() - t0) * 1000)
+        logger.info(f"4x6 Print Sheet for {session_id} generated in {export_time_ms} ms ({sheet_w}x{sheet_h} @ 300 DPI, {num_copies} copies)")
+
+        del final_img, resized_photo, sheet
+        gc.collect()
+
+        return JSONResponse(
+            content={
+                "success": True,
+                "session_id": session_id,
+                "export_time_ms": export_time_ms,
+                "download_url": f"/api/photo/download/{output_filename}",
+                "grid": {
+                    "cols": cols,
+                    "rows": rows,
+                    "copies": num_copies,
+                    "photo_width": pw,
+                    "photo_height": ph,
+                    "sheet_width": sheet_w,
+                    "sheet_height": sheet_h
+                }
+            }
+        )
+    except Exception as e:
+        logger.error(f"4x6 Sheet export failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=6">
+  <link rel="stylesheet" href="style.css?v=8">
 </head>
 <body>
   <div class="app-shell">
@@ -381,7 +381,7 @@
           </div>
         </div>
 
-        <!-- Step 7: Export / Download Panel -->
+        <!-- Step 7: Export / Download Panel (Single Photo) -->
         <div class="panel-card export-card hidden" id="exportCard">
           <div class="card-header">
             <h3>Export Passport</h3>
@@ -395,7 +395,114 @@
             </svg>
             <span>Download Passport Photo</span>
           </button>
-          <span class="safe-note">Exports at native camera resolution with exact passport framing.</span>
+          <span class="safe-note">Exports single photo at camera resolution with exact passport framing.</span>
+        </div>
+
+        <!-- Step 8: Print-Ready 4x6 Layout Panel -->
+        <div class="panel-card print-layout-card hidden" id="printLayoutCard">
+          <div class="card-header">
+            <div class="header-title-group">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="6 9 6 2 18 2 18 9"></polyline>
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+                <rect x="6" y="14" width="12" height="8"></rect>
+              </svg>
+              <h3>4×6 Print Layout</h3>
+            </div>
+            <span class="step-badge">STEP 8</span>
+          </div>
+
+          <!-- Sheet Specs Banner -->
+          <div class="print-spec-banner">
+            <span class="spec-icon">📄</span>
+            <div class="spec-info">
+              <span class="spec-title">Standard 4 × 6 Inch Sheet</span>
+              <span class="spec-subtitle">101.6 × 152.4 mm • 300 DPI (1200 × 1800 px)</span>
+            </div>
+          </div>
+
+          <!-- Page Orientation Toggle -->
+          <div class="print-control-row">
+            <label class="print-control-label">Sheet Orientation:</label>
+            <div class="orientation-toggle-group">
+              <button type="button" class="btn-orientation active" data-orientation="portrait" id="btnOrientPortrait">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2"/></svg>
+                Portrait (4×6")
+              </button>
+              <button type="button" class="btn-orientation" data-orientation="landscape" id="btnOrientLandscape">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/></svg>
+                Landscape (6×4")
+              </button>
+            </div>
+          </div>
+
+          <!-- Number of Copies -->
+          <div class="print-control-row">
+            <div class="control-header-flex">
+              <label for="printCopiesInput">Number of Copies:</label>
+              <span class="range-val" id="printCopiesVal">8 copies</span>
+            </div>
+            <div class="copies-stepper-row">
+              <button type="button" class="btn-step" id="btnCopiesMinus" aria-label="Decrease copies">−</button>
+              <input type="number" id="printCopiesInput" min="1" max="16" value="8" class="copies-number-input">
+              <button type="button" class="btn-step" id="btnCopiesPlus" aria-label="Increase copies">+</button>
+              <button type="button" class="btn-max-fit" id="btnMaxFit">Fill Page (Max)</button>
+            </div>
+          </div>
+
+          <!-- Black Border Thickness Slider -->
+          <div class="print-control-row">
+            <div class="control-header-flex">
+              <label for="printBorderSlider">Photo Border (Black):</label>
+              <span class="range-val" id="printBorderVal">2 px</span>
+            </div>
+            <input type="range" id="printBorderSlider" min="0" max="8" step="1" value="2">
+            <div class="range-sub-hint">Clean black cutting border around every passport photo.</div>
+          </div>
+
+          <!-- Photo Spacing (Gap) Slider -->
+          <div class="print-control-row">
+            <div class="control-header-flex">
+              <label for="printSpacingSlider">Photo Spacing (Gap):</label>
+              <span class="range-val" id="printSpacingVal">20 px</span>
+            </div>
+            <input type="range" id="printSpacingSlider" min="0" max="50" step="2" value="20">
+            <div class="range-sub-hint">Equal spacing between adjacent photos.</div>
+          </div>
+
+          <!-- Sheet Margins Slider -->
+          <div class="print-control-row">
+            <div class="control-header-flex">
+              <label for="printMarginSlider">Sheet Margin:</label>
+              <span class="range-val" id="printMarginVal">30 px</span>
+            </div>
+            <input type="range" id="printMarginSlider" min="10" max="80" step="5" value="30">
+            <div class="range-sub-hint">Consistent spacing from 4×6 paper edges.</div>
+          </div>
+
+          <!-- Capacity & Arrangement Summary -->
+          <div class="layout-summary-box" id="layoutSummaryBox">
+            <div class="summary-line">
+              <span class="summary-label">Grid Arrangement:</span>
+              <span class="summary-value" id="printGridLabel">2 cols × 4 rows (8 max)</span>
+            </div>
+            <div class="summary-line">
+              <span class="summary-label">Aspect Ratio:</span>
+              <span class="summary-value" id="printRatioLabel">35:45 (Locked)</span>
+            </div>
+          </div>
+
+          <!-- Download 4x6 Sheet Button -->
+          <button type="button" class="btn-primary btn-download-4x6" id="btnDownload4x6">
+            <span class="btn-spinner hidden" id="download4x6Spinner"></span>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 6 2 18 2 18 9"></polyline>
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+              <rect x="6" y="14" width="12" height="8"></rect>
+            </svg>
+            <span id="download4x6BtnText">Download 4×6 Print Sheet (300 DPI)</span>
+          </button>
+          <span class="safe-note">Exported at 1200 × 1800 px (300 DPI) for physical photo lab printing.</span>
         </div>
 
         <!-- Advanced Performance Telemetry -->
@@ -438,8 +545,9 @@
         <div class="preview-header">
           <div class="view-mode-tabs">
             <button type="button" class="tab-btn" data-mode="original" id="tabOriginal">Original</button>
-            <button type="button" class="tab-btn" data-mode="processed" id="tabProcessed">Processed</button>
+            <button type="button" class="tab-btn" data-mode="processed" id="tabProcessed">Passport Photo</button>
             <button type="button" class="tab-btn active" data-mode="split" id="tabSplit">Split View</button>
+            <button type="button" class="tab-btn print-tab-btn" data-mode="print" id="tabPrint">🖨️ 4×6 Print Sheet</button>
             <button type="button" class="tab-btn hidden" data-mode="compare" id="tabCompare">Compare View</button>
           </div>
 
@@ -538,6 +646,27 @@
             </div>
           </div>
 
+          <!-- Print-Ready 4x6 Sheet Viewport Container -->
+          <div class="print-viewport-container hidden" id="printViewportContainer">
+            <div class="print-sheet-header-bar">
+              <div class="sheet-title-col">
+                <span class="sheet-title-text">🖨️ 4 × 6 INCH PRINT SHEET (PREVIEW)</span>
+                <span class="sheet-dim-tag" id="sheetDimTag">Portrait 4 × 6 in (1200 × 1800 px) • 300 DPI</span>
+              </div>
+              <div class="sheet-actions">
+                <button type="button" class="btn-sheet-view" id="btnSwitchToPassport" title="Back to Single Passport View">Single Passport View</button>
+              </div>
+            </div>
+
+            <div class="print-sheet-canvas-area" id="printSheetCanvasArea">
+              <!-- Physical 4x6 Sheet Frame with realistic photo paper surface and boundary -->
+              <div class="print-sheet-paper-card" id="printSheetPaperCard">
+                <canvas id="printSheetCanvas" class="print-sheet-canvas"></canvas>
+                <div class="sheet-paper-watermark" id="sheetPaperWatermark">4 × 6 INCH SHEET (102 × 152 mm) • 300 DPI</div>
+              </div>
+            </div>
+          </div>
+
           <!-- Model Comparison Grid Container (Advanced Mode) -->
           <div class="comparison-grid-container hidden" id="comparisonGridContainer">
             <div class="compare-card" id="cardCmpBiRefNet">
@@ -584,6 +713,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=6"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

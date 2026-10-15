@@ -2019,8 +2019,345 @@ input[type="text"]#colorHexInput {
   letter-spacing: 0.03em;
 }
 
+/* ==========================================================================
+   STEP 8: PRINT-READY 4x6 LAYOUT PANEL & VIEWPORT STYLES
+   ========================================================================== */
+
+.print-layout-card {
+  border-color: rgba(59, 130, 246, 0.4);
+}
+
+.print-spec-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.print-spec-banner .spec-icon {
+  font-size: 1.25rem;
+}
+
+.print-spec-banner .spec-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.print-spec-banner .spec-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.print-spec-banner .spec-subtitle {
+  font-size: 0.68rem;
+  color: #79c0ff;
+  font-family: var(--font-mono);
+}
+
+.print-control-row {
+  margin-bottom: 14px;
+}
+
+.print-control-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.orientation-toggle-group {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-orientation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-orientation:hover {
+  border-color: #58a6ff;
+  color: var(--text-main);
+  background: rgba(88, 166, 255, 0.05);
+}
+
+.btn-orientation.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: #3b82f6;
+  color: #60a5fa;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+}
+
+.copies-stepper-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.btn-step {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn-step:hover {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.copies-number-input {
+  width: 50px;
+  height: 32px;
+  text-align: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+}
+
+.copies-number-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+}
+
+.btn-max-fit {
+  flex: 1;
+  height: 32px;
+  background: rgba(16, 185, 129, 0.15);
+  border: 1px solid rgba(16, 185, 129, 0.4);
+  color: #34d399;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-max-fit:hover {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+}
+
+.range-sub-hint {
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.layout-summary-box {
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.72rem;
+}
+
+.summary-line .summary-label {
+  color: var(--text-muted);
+}
+
+.summary-line .summary-value {
+  color: #79c0ff;
+  font-family: var(--font-mono);
+  font-weight: 600;
+}
+
+.btn-download-4x6 {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  padding: 11px 16px;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transition: all 0.2s ease;
+}
+
+.btn-download-4x6:hover {
+  background: linear-gradient(135deg, #1d4ed8, #1e40af);
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-download-4x6:active {
+  transform: translateY(0);
+}
+
+.print-tab-btn {
+  color: #60a5fa !important;
+}
+
+.print-tab-btn.active {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+}
+
+/* 4x6 Sheet Viewport Surface */
+.print-viewport-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  max-width: 1100px;
+  max-height: 820px;
+}
+
+.print-sheet-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  border-bottom: none;
+}
+
+.sheet-title-col {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sheet-title-text {
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-main);
+  letter-spacing: 0.04em;
+}
+
+.sheet-dim-tag {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.btn-sheet-view {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sheet-view:hover {
+  color: var(--text-main);
+  border-color: #58a6ff;
+}
+
+.print-sheet-canvas-area {
+  flex: 1;
+  background: repeating-conic-gradient(#12161f 0% 25%, #181f2b 0% 50%) 50% / 24px 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Realistic 4x6 Photo Paper Sheet (Exact 1:1 match to physical page area) */
+.print-sheet-paper-card {
+  position: relative;
+  aspect-ratio: 4 / 6;
+  max-width: 96%;
+  max-height: 96%;
+  background: #ffffff;
+  border: 1px solid #94a3b8;
+  border-radius: 2px;
+  box-shadow:
+    0 20px 48px rgba(0, 0, 0, 0.8),
+    0 4px 14px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.12);
+  display: block;
+  overflow: hidden;
+  box-sizing: border-box;
+  margin: auto;
+  transition: width 0.15s ease, height 0.15s ease;
+}
+
+.print-sheet-paper-card.landscape-sheet {
+  aspect-ratio: 6 / 4;
+}
+
+.print-sheet-canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+  background: #ffffff;
+}
+
+.sheet-paper-watermark {
+  display: none;
+}
+
 .hidden {
   display: none !important;
 }
+
 
 
