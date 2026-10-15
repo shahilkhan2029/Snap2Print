@@ -255,10 +255,13 @@ document.addEventListener("DOMContentLoaded", () => {
     showOverlay(true);
     hideError();
 
-    setStage("Analyzing photo...", 15);
-    const t1 = setTimeout(() => setStage("Running BiRefNet-Portrait...", 45), 500);
-    const t2 = setTimeout(() => setStage("Refining edges...", 80), 2500);
-    const t3 = setTimeout(() => setStage("Preparing studio preview...", 95), 4500);
+    const isStudio = methodModeSelect.value === "birefnet";
+    setStage(isStudio ? "Analyzing photo for Studio Quality..." : "Analyzing photo...", 20);
+    const t1 = setTimeout(() => {
+      setStage(isStudio ? "Running BiRefNet-Portrait (Studio Quality)..." : "Running Fast AI Segmentation...", 50);
+    }, 300);
+    const t2 = setTimeout(() => setStage("Refining edges...", 80), isStudio ? 3000 : 700);
+    const t3 = setTimeout(() => setStage("Preparing studio preview...", 95), isStudio ? 6000 : 1000);
 
     const formData = new FormData();
     formData.append("file", memoryCache.currentFile);

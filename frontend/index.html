@@ -93,10 +93,11 @@
               <label class="setting-row">
                 <span class="setting-title">Engine Selection:</span>
                 <select id="methodModeSelect" class="form-select">
-                  <option value="auto" selected>Auto (BiRefNet Portrait or Chroma Key)</option>
-                  <option value="birefnet">Force BiRefNet-Portrait (Studio Quality)</option>
-                  <option value="chroma_key">Force Chroma Key</option>
-                  <option value="u2netp">Force U2NetP (Lightweight Fallback)</option>
+                  <option value="auto" selected>Auto: Fast AI / Chroma Key (Recommended)</option>
+                  <option value="mediapipe">MediaPipe Fast AI (Instant ~0.1s)</option>
+                  <option value="birefnet">BiRefNet-Portrait (Studio Quality — Higher CPU)</option>
+                  <option value="chroma_key">Force Chroma Key (Green/Blue Screen)</option>
+                  <option value="u2netp">Force U2NetP (Legacy Fallback)</option>
                 </select>
               </label>
 
@@ -107,7 +108,7 @@
               <input type="range" id="smoothnessSlider" min="0.5" max="2.5" step="0.25" value="1.0">
 
               <button type="button" class="btn-compare-action" id="compareModelsBtn" disabled>
-                <span>Compare Models (BiRefNet vs U2NetP vs Chroma)</span>
+                <span>Compare Engines (MediaPipe vs BiRefNet vs U2NetP vs Chroma)</span>
               </button>
             </div>
           </details>

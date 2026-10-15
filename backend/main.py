@@ -22,12 +22,13 @@ async def lifespan(app: FastAPI):
     Warms up the background model once during server start
     so the first request does not incur cold-start latency.
     """
-    logger.info("Snap2Print starting up. Initializing lightweight model...")
+    logger.info("Snap2Print starting up. Initializing MediaPipe fast segmentor...")
     try:
-        get_background_remover()
-        logger.info("Model pre-loaded and ready for fast CPU inference.")
+        from backend.services.mediapipe_segmentation import get_mediapipe_segmentor
+        get_mediapipe_segmentor()
+        logger.info("MediaPipe fast model pre-loaded and ready for instant CPU inference.")
     except Exception as e:
-        logger.warning(f"Model warm-up deferred or failed: {e}. Will initialize on first request.")
+        logger.warning(f"MediaPipe warm-up deferred or failed: {e}. Will initialize on first request.")
     yield
     logger.info("Snap2Print shutting down.")
 

@@ -16,6 +16,7 @@ from backend.services.background_analyzer import analyze_background
 from backend.services.chroma_key import segment_chroma_key
 from backend.services.background_removal import get_background_remover
 from backend.services.birefnet_portrait import get_birefnet_remover
+from backend.services.mediapipe_segmentation import get_mediapipe_segmentor
 from backend.services.mask_refinement import refine_hybrid_mask, evaluate_mask_quality
 from backend.services.image_compositor import composite_studio_background
 from backend.utils.image_ops import validate_image_file, load_and_preprocess_image, resize_if_needed
@@ -61,12 +62,10 @@ async def process_background(
 ):
     """
     STAGE A: EXPENSIVE AI PROCESSING (Runs ONCE per photo)
-    1. Saves original immutable file to input/
-    2. Runs BiRefNet-Portrait (or Chroma Key if uniform) to generate raw mask
-    3. Refines mask with controlled edge smoothing
-    4. Saves full-resolution mask and preview-resolution transparent PNG to disk & memory cache
-    5. Returns transparent preview + preview mask to frontend
-    6. DOES NOT composite backgrounds yet — all preview color changes happen instantly in the browser!
+    3-Tier routing:
+      Tier 1 — Chroma Key:  ~instant, for green/blue uniform backdrops (auto or manual)
+      Tier 2 — MediaPipe:   ~1-5s CPU, default for all portraits/complex scenes
+      Tier 3 — BiRefNet:    ~60-180s CPU, optional 'Studio Quality' on manual override
     """
     total_start = time.time()
     file_bytes = await file.read()
@@ -89,8 +88,8 @@ async def process_background(
     with open(input_filepath, "wb") as f:
         f.write(file_bytes)
 
-    # Downscale for segmentation to preserve CPU RAM (max 1536px)
-    img_for_seg, was_resized = resize_if_needed(original_img, max_dim=1536)
+    # Downscale for segmentation: 1024px max for MediaPipe/BiRefNet (faster, sufficient quality)
+    img_for_seg, was_resized = resize_if_needed(original_img, max_dim=1024)
     seg_size = img_for_seg.size
     t_pre_ms = int((time.time() - t_pre_start) * 1000)
 
@@ -100,25 +99,31 @@ async def process_background(
     bg_analysis = analyze_background(rgb_seg_np)
     t_analysis_ms = int((time.time() - t_analysis_start) * 1000)
 
-    # Select method
+    # --- 3-Tier Method Selection ---
+    # method_mode values: "auto", "mediapipe", "birefnet", "u2netp", "chroma_key"
     if method_mode == "birefnet":
         selected_method = "birefnet"
-        method_reason = "Manual override: BiRefNet-Portrait (Studio Quality)"
+        method_reason = "Manual override: BiRefNet-Portrait (Studio Quality — slow on CPU)"
     elif method_mode == "u2netp":
         selected_method = "u2netp"
-        method_reason = "Manual override: U2NetP AI fallback"
+        method_reason = "Manual override: U2NetP (Legacy lightweight AI)"
     elif method_mode == "chroma_key":
         selected_method = "chroma_key"
         method_reason = "Manual override: Chroma Key"
-    else:
+    elif method_mode == "mediapipe":
+        selected_method = "mediapipe"
+        method_reason = "Manual override: MediaPipe Selfie Segmentation (Fast CPU)"
+    else:  # auto
         if bg_analysis["is_uniform"] and bg_analysis["detected_color"] in ("green", "blue"):
+            # Tier 1: Uniform color backdrop -> instant chroma key
             selected_method = "chroma_key"
-            method_reason = f"Uniform {bg_analysis['detected_color']} backdrop detected (Score: {bg_analysis['uniformity_score']:.2f}) -> Auto Chroma Key"
+            method_reason = f"Uniform {bg_analysis['detected_color']} backdrop (Score: {bg_analysis['uniformity_score']:.2f}) -> Auto Chroma Key"
         else:
-            selected_method = "birefnet"
-            method_reason = f"Natural/Portrait backdrop detected (Score: {bg_analysis['uniformity_score']:.2f}) -> BiRefNet-Portrait"
+            # Tier 2: All other scenes -> MediaPipe (fast, good quality)
+            selected_method = "mediapipe"
+            method_reason = f"Portrait/complex scene (Score: {bg_analysis['uniformity_score']:.2f}) -> MediaPipe Fast AI"
 
-    # 3. Model Inference (Timed separately)
+    # 3. Model Inference
     t_seg_start = time.time()
     try:
         if selected_method == "chroma_key":
@@ -130,6 +135,10 @@ async def process_background(
                 protect_skin=True
             )
             working_small_np = despilled_small
+        elif selected_method == "mediapipe":
+            mp_seg = get_mediapipe_segmentor()
+            raw_mask_small, _ = mp_seg.segment_mask(img_for_seg, seg_resolution=1024)
+            working_small_np = rgb_seg_np
         elif selected_method == "birefnet":
             remover = get_birefnet_remover()
             raw_mask_small, _ = remover.segment_mask(img_for_seg)
@@ -201,9 +210,10 @@ async def process_background(
     total_time_ms = int((time.time() - total_start) * 1000)
 
     friendly_name = {
-        "birefnet": "BiRefNet-Portrait",
-        "u2netp": "U2NetP (Lightweight)",
-        "chroma_key": "Chroma Key"
+        "mediapipe": "MediaPipe Selfie (Fast CPU)",
+        "birefnet":  "BiRefNet-Portrait (Studio Quality)",
+        "u2netp":    "U2NetP (Legacy Lightweight)",
+        "chroma_key": "Chroma Key (Instant)"
     }.get(selected_method, selected_method)
 
     return JSONResponse(
@@ -317,6 +327,30 @@ async def compare_models(
     rgb_comp_np = np.array(img_for_comp)
 
     comparison_results = {}
+
+    # 0. MediaPipe Selfie Segmenter (Fastest AI)
+    try:
+        t0 = time.time()
+        mp_segmentor = get_mediapipe_segmentor()
+        m_raw_mask, _ = mp_segmentor.segment_mask(img_for_comp, seg_resolution=1024)
+        m_ref_mask = refine_hybrid_mask(m_raw_mask, rgb_comp_np, smoothness=1.0)
+        m_trans = img_for_comp.convert("RGBA")
+        m_trans.putalpha(Image.fromarray(m_ref_mask, mode="L"))
+        m_final = composite_studio_background(m_trans, bg_type=bg_type)
+        m_time = int((time.time() - t0) * 1000)
+
+        comparison_results["mediapipe"] = {
+            "name": "MediaPipe Selfie (Fast)",
+            "time_ms": m_time,
+            "inference_res": f"{img_for_comp.size[0]}x{img_for_comp.size[1]}",
+            "output_res": f"{original_size[0]}x{original_size[1]}",
+            "preview": to_base64_data_url(m_final),
+            "status": "Success"
+        }
+        del m_trans, m_final
+        gc.collect()
+    except Exception as e:
+        comparison_results["mediapipe"] = {"name": "MediaPipe Selfie", "error": str(e)}
 
     # 1. BiRefNet-Portrait
     try:

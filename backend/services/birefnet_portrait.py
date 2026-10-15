@@ -37,11 +37,17 @@ class BiRefNetPortraitBackend:
     def _initialize_session(self):
         try:
             os.environ["U2NET_HOME"] = str(MODELS_DIR)
-            import rembg
+            import onnxruntime as ort
+            sess_opts = ort.SessionOptions()
+            cpu_count = os.cpu_count() or 4
+            sess_opts.intra_op_num_threads = cpu_count
+            sess_opts.inter_op_num_threads = 2
+            sess_opts.execution_mode = ort.ExecutionMode.ORT_PARALLEL
+            sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-            logger.info("Initializing persistent BiRefNet-Portrait session...")
+            logger.info(f"Initializing persistent BiRefNet-Portrait session (threads={cpu_count})...")
             t0 = time.time()
-            self.session = rembg.new_session(self.model_name)
+            self.session = rembg.new_session(self.model_name, sess_opts=sess_opts)
             load_time = int((time.time() - t0) * 1000)
             logger.info(f"BiRefNet-Portrait session initialized successfully in {load_time} ms.")
         except Exception as e:
