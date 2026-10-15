@@ -37,6 +37,7 @@ class BiRefNetPortraitBackend:
     def _initialize_session(self):
         try:
             os.environ["U2NET_HOME"] = str(MODELS_DIR)
+            import rembg
             import onnxruntime as ort
             sess_opts = ort.SessionOptions()
             cpu_count = os.cpu_count() or 4

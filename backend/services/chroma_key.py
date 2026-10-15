@@ -140,7 +140,13 @@ def suppress_chroma_spill(
     """
     Neutralizes green or blue screen bounce light reflected on the hair, shoulders, and clothes.
     """
-    transition_zone = (mask > 5) & (mask < 245)
+    # Detect fringe zone: morphological boundary of subject (inner ~5px) plus soft alpha transition
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (7, 7))
+    fg_binary = (mask > 50).astype(np.uint8)
+    eroded_fg = cv2.erode(fg_binary, kernel, iterations=1)
+    fringe_zone = (fg_binary == 1) & (eroded_fg == 0)
+    transition_zone = fringe_zone | ((mask > 5) & (mask < 245))
+
     if not np.any(transition_zone):
         return rgb_img
 
@@ -156,14 +162,16 @@ def suppress_chroma_spill(
     b = result[:, :, 2].astype(np.float32)
 
     if is_green:
-        # Standard green despill: limit green channel to average of red and blue on fringe
+        # Green despill: on subject boundary, clamp green if it dominates red and blue
+        excess_g = transition_zone & (g > r) & (g > b)
         max_allowed_g = (r + b) * 0.5
-        g[transition_zone] = np.minimum(g[transition_zone], max_allowed_g[transition_zone])
+        g[excess_g] = np.minimum(g[excess_g], max_allowed_g[excess_g])
         result[:, :, 1] = np.clip(g, 0, 255).astype(np.uint8)
     elif is_blue:
-        # Standard blue despill: limit blue channel to average of red and green on fringe
+        # Blue despill: on subject boundary, clamp blue if it dominates red and green
+        excess_b = transition_zone & (b > r) & (b > g)
         max_allowed_b = (r + g) * 0.5
-        b[transition_zone] = np.minimum(b[transition_zone], max_allowed_b[transition_zone])
+        b[excess_b] = np.minimum(b[excess_b], max_allowed_b[excess_b])
         result[:, :, 2] = np.clip(b, 0, 255).astype(np.uint8)
     else:
         # General despill: desaturate boundary in HSV

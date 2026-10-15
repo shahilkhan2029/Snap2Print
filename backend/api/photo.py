@@ -184,7 +184,16 @@ async def process_background(
     preview_img, _ = resize_if_needed(original_img, max_dim=MAX_PREVIEW_DIM)
     preview_mask = refined_small_pil.resize(preview_img.size, Image.Resampling.BILINEAR)
 
-    preview_rgba = preview_img.convert("RGBA")
+    # Neutralize chroma spill (green/blue halo) on preview if backdrop was green or blue
+    if bg_analysis.get("detected_color") in ("green", "blue"):
+        from backend.services.chroma_key import suppress_chroma_spill
+        preview_rgb_np = np.array(preview_img.convert("RGB"))
+        mask_np = np.array(preview_mask)
+        despilled_preview = suppress_chroma_spill(preview_rgb_np, mask_np, bg_analysis["estimated_color_rgb"])
+        preview_rgba = Image.fromarray(despilled_preview).convert("RGBA")
+    else:
+        preview_rgba = preview_img.convert("RGBA")
+
     preview_rgba.putalpha(preview_mask)
 
     # Save transparent preview data URL
@@ -200,6 +209,7 @@ async def process_background(
         "original_size": original_size,
         "preview_size": preview_img.size,
         "method": selected_method,
+        "bg_analysis": bg_analysis,
         "timestamp": time.time()
     }
 
@@ -277,13 +287,23 @@ async def export_final(
         from PIL import ImageOps
         orig_img = Image.open(session["original_path"])
         orig_img = ImageOps.exif_transpose(orig_img)
-        orig_img = orig_img.convert("RGBA")
         full_mask = Image.open(session["mask_path"]).convert("L")
 
-        orig_img.putalpha(full_mask)
+        # Neutralize green/blue spill on full-res export if detected
+        bg_analysis = session.get("bg_analysis", {})
+        if bg_analysis.get("detected_color") in ("green", "blue"):
+            from backend.services.chroma_key import suppress_chroma_spill
+            orig_rgb_np = np.array(orig_img.convert("RGB"))
+            mask_np = np.array(full_mask)
+            despilled = suppress_chroma_spill(orig_rgb_np, mask_np, bg_analysis["estimated_color_rgb"])
+            orig_rgba = Image.fromarray(despilled).convert("RGBA")
+        else:
+            orig_rgba = orig_img.convert("RGBA")
+
+        orig_rgba.putalpha(full_mask)
 
         # Composite background
-        final_img = composite_studio_background(orig_img, bg_type=bg_type, custom_hex=custom_color)
+        final_img = composite_studio_background(orig_rgba, bg_type=bg_type, custom_hex=custom_color)
 
         output_filename = f"{session_id}_export_{bg_type}.png"
         output_filepath = OUTPUT_DIR / output_filename
