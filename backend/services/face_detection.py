@@ -63,7 +63,7 @@ class FaceDetectionService:
                 model=str(self.model_path),
                 config="",
                 input_size=(320, 320),
-                score_threshold=0.5,
+                score_threshold=0.35,
                 nms_threshold=0.3,
                 top_k=5000
             )
@@ -152,106 +152,102 @@ class FaceDetectionService:
                 "inference_time_ms": elapsed_ms
             }
 
-        # Select primary face:
-        # In studio portrait photography, the primary face is the largest face near the image center
-        center_x, center_y = img_w / 2.0, img_h / 2.0
-        best_face = None
-        best_score = -1.0
+        # Process all detected faces
+        faces_data = []
+        inv_scale = 1.0 / scale_det
+        scale_x = orig_w / float(img_w)
+        scale_y = orig_h / float(img_h)
 
-        for f in faces:
-            bx, by, bw, bh = f[:4]
-            conf = float(f[14])
-            area = float(bw * bh)
-            face_center_x = bx + bw / 2.0
-            face_center_y = by + bh / 2.0
-            dist_to_center = np.hypot(face_center_x - center_x, face_center_y - center_y)
-            # Normalization factor: prioritize larger area and central placement
-            ranking_metric = area * (1.0 - (dist_to_center / np.hypot(center_x, center_y)) * 0.3) * conf
+        # Sort faces from left to right for intuitive numbering
+        sorted_faces = sorted(faces, key=lambda f: float(f[0]))
 
-            if ranking_metric > best_score:
-                best_score = ranking_metric
-                best_face = f
+        for idx, f in enumerate(sorted_faces, start=1):
+            bx = max(0, int(f[0] * inv_scale))
+            by = max(0, int(f[1] * inv_scale))
+            bw = min(int(f[2] * inv_scale), img_w - bx)
+            bh = min(int(f[3] * inv_scale), img_h - by)
+            conf = round(float(f[14]), 3)
 
-        if best_face is None:
+            lm_raw = [float(v) * inv_scale for v in f[4:14]]
+            landmarks_data = {
+                "right_eye": {
+                    "x": int(lm_raw[0]), "y": int(lm_raw[1]),
+                    "x_norm": round(lm_raw[0] / float(img_w), 4), "y_norm": round(lm_raw[1] / float(img_h), 4),
+                    "orig_x": int(lm_raw[0] * scale_x), "orig_y": int(lm_raw[1] * scale_y)
+                },
+                "left_eye": {
+                    "x": int(lm_raw[2]), "y": int(lm_raw[3]),
+                    "x_norm": round(lm_raw[2] / float(img_w), 4), "y_norm": round(lm_raw[3] / float(img_h), 4),
+                    "orig_x": int(lm_raw[2] * scale_x), "orig_y": int(lm_raw[3] * scale_y)
+                },
+                "nose_tip": {
+                    "x": int(lm_raw[4]), "y": int(lm_raw[5]),
+                    "x_norm": round(lm_raw[4] / float(img_w), 4), "y_norm": round(lm_raw[5] / float(img_h), 4),
+                    "orig_x": int(lm_raw[4] * scale_x), "orig_y": int(lm_raw[5] * scale_y)
+                },
+                "right_mouth": {
+                    "x": int(lm_raw[6]), "y": int(lm_raw[7]),
+                    "x_norm": round(lm_raw[6] / float(img_w), 4), "y_norm": round(lm_raw[7] / float(img_h), 4),
+                    "orig_x": int(lm_raw[6] * scale_x), "orig_y": int(lm_raw[7] * scale_y)
+                },
+                "left_mouth": {
+                    "x": int(lm_raw[8]), "y": int(lm_raw[9]),
+                    "x_norm": round(lm_raw[8] / float(img_w), 4), "y_norm": round(lm_raw[9] / float(img_h), 4),
+                    "orig_x": int(lm_raw[8] * scale_x), "orig_y": int(lm_raw[9] * scale_y)
+                }
+            }
+
+            bbox_data = {
+                "x": bx,
+                "y": by,
+                "width": bw,
+                "height": bh,
+                "orig_x": int(bx * scale_x),
+                "orig_y": int(by * scale_y),
+                "orig_width": int(bw * scale_x),
+                "orig_height": int(bh * scale_y),
+                "x_norm": round(bx / float(img_w), 4),
+                "y_norm": round(by / float(img_h), 4),
+                "w_norm": round(bw / float(img_w), 4),
+                "h_norm": round(bh / float(img_h), 4)
+            }
+
+            faces_data.append({
+                "id": idx,
+                "label": f"Face {idx}",
+                "confidence": conf,
+                "bounding_box": bbox_data,
+                "landmarks": landmarks_data
+            })
+
+        count = len(faces_data)
+        if count == 0:
             return {
                 "detected": False,
                 "status": "No face detected",
                 "confidence": 0.0,
                 "bounding_box": None,
                 "landmarks": None,
-                "face_count": len(faces),
+                "face_count": 0,
+                "faces": [],
                 "inference_time_ms": elapsed_ms
             }
 
-        # Map from inference resolution (inf_w, inf_h) to input image resolution (img_w, img_h)
-        inv_scale = 1.0 / scale_det
-        bx = max(0, int(best_face[0] * inv_scale))
-        by = max(0, int(best_face[1] * inv_scale))
-        bw = min(int(best_face[2] * inv_scale), img_w - bx)
-        bh = min(int(best_face[3] * inv_scale), img_h - by)
-        conf = round(float(best_face[14]), 3)
+        # Identify most prominent / largest face as primary face
+        primary_face = max(faces_data, key=lambda f: f["bounding_box"]["width"] * f["bounding_box"]["height"])
+        status_text = f"{count} faces detected" if count > 1 else "Face detected"
 
-        # Scale factors to original resolution
-        scale_x = orig_w / float(img_w)
-        scale_y = orig_h / float(img_h)
-
-        bbox_data = {
-            # Coordinates relative to currently processed image
-            "x": bx,
-            "y": by,
-            "width": bw,
-            "height": bh,
-            # Coordinates relative to full-resolution original photo
-            "orig_x": int(bx * scale_x),
-            "orig_y": int(by * scale_y),
-            "orig_width": int(bw * scale_x),
-            "orig_height": int(bh * scale_y),
-            # Normalized coordinates (0.0 to 1.0) for UI overlays
-            "x_norm": round(bx / float(img_w), 4),
-            "y_norm": round(by / float(img_h), 4),
-            "w_norm": round(bw / float(img_w), 4),
-            "h_norm": round(bh / float(img_h), 4)
-        }
-
-        # Extract 5 landmarks: right_eye, left_eye, nose, right_mouth, left_mouth
-        lm_raw = [float(v) * inv_scale for v in best_face[4:14]]
-        landmarks_data = {
-            "right_eye": {
-                "x": int(lm_raw[0]), "y": int(lm_raw[1]),
-                "x_norm": round(lm_raw[0] / float(img_w), 4), "y_norm": round(lm_raw[1] / float(img_h), 4),
-                "orig_x": int(lm_raw[0] * scale_x), "orig_y": int(lm_raw[1] * scale_y)
-            },
-            "left_eye": {
-                "x": int(lm_raw[2]), "y": int(lm_raw[3]),
-                "x_norm": round(lm_raw[2] / float(img_w), 4), "y_norm": round(lm_raw[3] / float(img_h), 4),
-                "orig_x": int(lm_raw[2] * scale_x), "orig_y": int(lm_raw[3] * scale_y)
-            },
-            "nose_tip": {
-                "x": int(lm_raw[4]), "y": int(lm_raw[5]),
-                "x_norm": round(lm_raw[4] / float(img_w), 4), "y_norm": round(lm_raw[5] / float(img_h), 4),
-                "orig_x": int(lm_raw[4] * scale_x), "orig_y": int(lm_raw[5] * scale_y)
-            },
-            "right_mouth": {
-                "x": int(lm_raw[6]), "y": int(lm_raw[7]),
-                "x_norm": round(lm_raw[6] / float(img_w), 4), "y_norm": round(lm_raw[7] / float(img_h), 4),
-                "orig_x": int(lm_raw[6] * scale_x), "orig_y": int(lm_raw[7] * scale_y)
-            },
-            "left_mouth": {
-                "x": int(lm_raw[8]), "y": int(lm_raw[9]),
-                "x_norm": round(lm_raw[8] / float(img_w), 4), "y_norm": round(lm_raw[9] / float(img_h), 4),
-                "orig_x": int(lm_raw[8] * scale_x), "orig_y": int(lm_raw[9] * scale_y)
-            }
-        }
-
-        logger.debug(f"Primary face detected: bbox={bbox_data['x']},{bbox_data['y']} {bbox_data['width']}x{bbox_data['height']} ({conf*100:.1f}%) in {elapsed_ms}ms")
+        logger.debug(f"{count} face(s) detected in {elapsed_ms}ms")
 
         return {
             "detected": True,
-            "status": "Face detected",
-            "confidence": conf,
-            "bounding_box": bbox_data,
-            "landmarks": landmarks_data,
-            "face_count": len(faces),
+            "status": status_text,
+            "face_count": count,
+            "confidence": primary_face["confidence"],
+            "bounding_box": primary_face["bounding_box"],
+            "landmarks": primary_face["landmarks"],
+            "primary_face": primary_face,
+            "faces": faces_data,
             "inference_time_ms": elapsed_ms
         }
 

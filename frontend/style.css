@@ -949,6 +949,17 @@ input[type="text"]#colorHexInput {
   background-color: currentColor;
 }
 
+.face-overlays-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 10;
+  overflow: visible;
+}
+
 .face-box-overlay {
   position: absolute;
   border: 2px solid #58a6ff;

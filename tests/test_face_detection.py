@@ -63,6 +63,22 @@ def test_face_detector_unit():
             assert 0.0 <= landmarks[lm_name]["y_norm"] <= 1.0
         print("PASS: Customer photo face detection verified with 5 landmarks.")
 
+    # 1.5 Test on multi-person group photo 5e14125c_original.jpg
+    group_photo_path = BASE_DIR / "input" / "5e14125c_original.jpg"
+    if group_photo_path.exists():
+        with open(group_photo_path, "rb") as f:
+            img, orig_sz = load_and_preprocess_image(f.read())
+        res_group = detector.detect_primary_face(img, original_size=orig_sz)
+        print(f"\nGroup Photo Detection: status={res_group['status']}, count={res_group['face_count']}")
+        assert res_group["detected"] is True
+        assert res_group["face_count"] >= 3, f"Expected at least 3 faces, got {res_group['face_count']}"
+        assert len(res_group["faces"]) == res_group["face_count"]
+        for f in res_group["faces"]:
+            assert f["bounding_box"] is not None
+            assert f["landmarks"] is not None
+            assert f["confidence"] > 0.4
+        print(f"PASS: Multi-face detection verified ({res_group['face_count']} faces detected).")
+
     # 2. Test on blank synthetic image (No face condition)
     blank_img = Image.new("RGB", (400, 400), color=(128, 128, 128))
     res_blank = detector.detect_primary_face(blank_img)

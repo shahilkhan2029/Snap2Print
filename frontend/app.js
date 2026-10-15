@@ -46,9 +46,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Task 1: Face Detection Elements
   const faceStatusBadge = document.getElementById("faceStatusBadge");
   const faceBadgeText = document.getElementById("faceBadgeText");
-  const faceBoxOverlay = document.getElementById("faceBoxOverlay");
-  const faceBoxTag = document.getElementById("faceBoxTag");
-  const lmDots = [0, 1, 2, 3, 4].map(i => document.getElementById(`lmDot${i}`));
+  const faceOverlaysContainer = document.getElementById("faceOverlaysContainer");
 
   const comparisonGridContainer = document.getElementById("comparisonGridContainer");
   const imgCmpB = document.getElementById("imgCmpB");
@@ -173,8 +171,7 @@ document.addEventListener("DOMContentLoaded", () => {
     memoryCache.maskPreviewUrl = null;
     memoryCache.faceDetection = null;
     if (faceStatusBadge) faceStatusBadge.classList.add("hidden");
-    if (faceBoxOverlay) faceBoxOverlay.classList.add("hidden");
-    lmDots.forEach(dot => dot && dot.classList.add("hidden"));
+    if (faceOverlaysContainer) faceOverlaysContainer.innerHTML = "";
     fileInput.value = "";
     fileInfoBar.classList.add("hidden");
     dropzoneContent.classList.remove("hidden");
@@ -311,13 +308,13 @@ document.addEventListener("DOMContentLoaded", () => {
       methodSub.textContent = data.method_info.reason;
       methodBanner.classList.remove("hidden");
 
-      // Update Face Detection (Task 1)
+      // Update Face Detection (Task 1: Detect all faces)
       if (data.face_detection) {
         memoryCache.faceDetection = data.face_detection;
-        if (data.face_detection.detected) {
+        const count = data.face_detection.face_count || (data.face_detection.detected ? 1 : 0);
+        if (data.face_detection.detected && count > 0) {
           faceStatusBadge.classList.remove("hidden", "no-face");
-          const confPct = Math.round((data.face_detection.confidence || 0) * 100);
-          faceBadgeText.textContent = `Face detected (${confPct}%)`;
+          faceBadgeText.textContent = count > 1 ? `${count} faces detected` : `Face detected (${Math.round((data.face_detection.confidence || 0) * 100)}%)`;
         } else {
           faceStatusBadge.classList.remove("hidden");
           faceStatusBadge.classList.add("no-face");
@@ -326,8 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
         setTimeout(updateFaceOverlay, 60);
       } else {
         faceStatusBadge.classList.add("hidden");
-        faceBoxOverlay.classList.add("hidden");
-        lmDots.forEach(dot => dot && dot.classList.add("hidden"));
+        if (faceOverlaysContainer) faceOverlaysContainer.innerHTML = "";
       }
 
       // Update Telemetry
@@ -472,16 +468,24 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(updateFaceOverlay, 50);
   }
 
-  // Task 1: Face Box Overlay Calculation (Pixel-perfect contain mapping)
+  // Task 1: Multi-Face Box Overlay Calculation (Pixel-perfect contain mapping)
   function updateFaceOverlay() {
-    if (!memoryCache.faceDetection || !memoryCache.faceDetection.detected || !memoryCache.faceDetection.bounding_box) {
-      if (faceBoxOverlay) faceBoxOverlay.classList.add("hidden");
-      lmDots.forEach((dot) => dot && dot.classList.add("hidden"));
-      return;
-    }
+    if (!faceOverlaysContainer) return;
+    faceOverlaysContainer.innerHTML = "";
 
-    const bbox = memoryCache.faceDetection.bounding_box;
-    const landmarks = memoryCache.faceDetection.landmarks;
+    const fd = memoryCache.faceDetection;
+    if (!fd || !fd.detected) return;
+
+    // Use faces list if available, fallback to single primary_face
+    const faces = fd.faces && fd.faces.length > 0 ? fd.faces : (fd.bounding_box ? [{
+      id: 1,
+      label: "Face",
+      confidence: fd.confidence,
+      bounding_box: fd.bounding_box,
+      landmarks: fd.landmarks
+    }] : []);
+
+    if (faces.length === 0) return;
 
     const img = imgProcessed;
     if (!img || !img.complete || img.naturalWidth === 0) {
@@ -519,36 +523,47 @@ document.addEventListener("DOMContentLoaded", () => {
       offsetY = padTop + (availH - renderedH) / 2;
     }
 
-    const boxX = offsetX + bbox.x_norm * renderedW;
-    const boxY = offsetY + bbox.y_norm * renderedH;
-    const boxW = bbox.w_norm * renderedW;
-    const boxH = bbox.h_norm * renderedH;
+    // Render an overlay box and landmarks for each detected face
+    faces.forEach((face) => {
+      const bbox = face.bounding_box;
+      if (!bbox) return;
 
-    faceBoxOverlay.style.left = `${Math.round(boxX)}px`;
-    faceBoxOverlay.style.top = `${Math.round(boxY)}px`;
-    faceBoxOverlay.style.width = `${Math.round(boxW)}px`;
-    faceBoxOverlay.style.height = `${Math.round(boxH)}px`;
+      const boxX = offsetX + bbox.x_norm * renderedW;
+      const boxY = offsetY + bbox.y_norm * renderedH;
+      const boxW = bbox.w_norm * renderedW;
+      const boxH = bbox.h_norm * renderedH;
 
-    const confPct = Math.round((memoryCache.faceDetection.confidence || 0) * 100);
-    faceBoxTag.textContent = `Primary Face (${confPct}%)`;
-    faceBoxOverlay.classList.remove("hidden");
+      const boxDiv = document.createElement("div");
+      boxDiv.className = "face-box-overlay";
+      boxDiv.style.left = `${Math.round(boxX)}px`;
+      boxDiv.style.top = `${Math.round(boxY)}px`;
+      boxDiv.style.width = `${Math.round(boxW)}px`;
+      boxDiv.style.height = `${Math.round(boxH)}px`;
 
-    if (landmarks) {
-      const keys = ["right_eye", "left_eye", "nose_tip", "right_mouth", "left_mouth"];
-      keys.forEach((key, idx) => {
-        const pt = landmarks[key];
-        const dot = lmDots[idx];
-        if (pt && dot) {
-          const ptX = offsetX + pt.x_norm * renderedW;
-          const ptY = offsetY + pt.y_norm * renderedH;
-          dot.style.left = `${Math.round(ptX)}px`;
-          dot.style.top = `${Math.round(ptY)}px`;
-          dot.classList.remove("hidden");
-        } else if (dot) {
-          dot.classList.add("hidden");
-        }
-      });
-    }
+      const confPct = Math.round((face.confidence || 0) * 100);
+      const tagSpan = document.createElement("span");
+      tagSpan.className = "face-box-tag";
+      tagSpan.textContent = `${face.label || `Face ${face.id}`} (${confPct}%)`;
+      boxDiv.appendChild(tagSpan);
+
+      faceOverlaysContainer.appendChild(boxDiv);
+
+      if (face.landmarks) {
+        const keys = ["right_eye", "left_eye", "nose_tip", "right_mouth", "left_mouth"];
+        keys.forEach((key) => {
+          const pt = face.landmarks[key];
+          if (pt) {
+            const ptX = offsetX + pt.x_norm * renderedW;
+            const ptY = offsetY + pt.y_norm * renderedH;
+            const dot = document.createElement("div");
+            dot.className = "face-landmark-dot";
+            dot.style.left = `${Math.round(ptX)}px`;
+            dot.style.top = `${Math.round(ptY)}px`;
+            faceOverlaysContainer.appendChild(dot);
+          }
+        });
+      }
+    });
   }
 
   // Update overlay when processed image renders or window changes size

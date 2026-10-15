@@ -268,16 +268,8 @@
               </div>
               <div class="img-frame" id="processedCompositeFrame">
                 <img id="imgProcessed" class="subject-fg-layer" alt="Processed Result">
-                <!-- Face Box Overlay Rectangle -->
-                <div class="face-box-overlay hidden" id="faceBoxOverlay">
-                  <span class="face-box-tag" id="faceBoxTag">Primary Face</span>
-                </div>
-                <!-- 5 Facial Keypoints -->
-                <div class="face-landmark-dot hidden" id="lmDot0" title="Right Eye"></div>
-                <div class="face-landmark-dot hidden" id="lmDot1" title="Left Eye"></div>
-                <div class="face-landmark-dot hidden" id="lmDot2" title="Nose Tip"></div>
-                <div class="face-landmark-dot hidden" id="lmDot3" title="Mouth Corner R"></div>
-                <div class="face-landmark-dot hidden" id="lmDot4" title="Mouth Corner L"></div>
+                <!-- Multi-Face Overlays Container (Renders all detected faces) -->
+                <div class="face-overlays-container" id="faceOverlaysContainer"></div>
               </div>
             </div>
           </div>
