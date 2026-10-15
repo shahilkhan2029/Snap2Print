@@ -180,6 +180,8 @@ async def process_cropped_background(
     from PIL import ImageOps
     orig_img = Image.open(session["original_path"])
     orig_img = ImageOps.exif_transpose(orig_img)
+    if orig_img.mode != "RGB":
+        orig_img = orig_img.convert("RGB")
     orig_w, orig_h = orig_img.size
 
     # Calculate integer pixel crop on full-resolution original
@@ -232,12 +234,16 @@ async def process_cropped_background(
 
     # Crop full-resolution original
     cropped_img = orig_img.crop((cx, cy, cx + cw, cy + ch))
+    if cropped_img.mode != "RGB":
+        cropped_img = cropped_img.convert("RGB")
     cropped_filename = f"{session_id}_cropped.png"
     cropped_filepath = INPUT_DIR / cropped_filename
     cropped_img.save(cropped_filepath, format="PNG")
 
     # Downscale crop for segmentation if necessary (passport crops are often ~1000-2000px, so 1024 max is ideal)
     img_for_seg, was_resized = resize_if_needed(cropped_img, max_dim=1024)
+    if img_for_seg.mode != "RGB":
+        img_for_seg = img_for_seg.convert("RGB")
     rgb_seg_np = np.array(img_for_seg)
 
     # Background Analysis of cropped portrait
@@ -650,6 +656,8 @@ def get_final_passport_image(
         if "original_path" in session and Path(session["original_path"]).exists():
             orig_img = Image.open(session["original_path"])
             orig_img = ImageOps.exif_transpose(orig_img)
+            if orig_img.mode != "RGB":
+                orig_img = orig_img.convert("RGB")
             orig_w, orig_h = orig_img.size
 
             try:
@@ -690,6 +698,8 @@ def get_final_passport_image(
     if is_cropped:
         src_img = Image.open(session["cropped_path"])
         src_img = ImageOps.exif_transpose(src_img)
+        if src_img.mode != "RGB":
+            src_img = src_img.convert("RGB")
         src_mask = Image.open(session["cropped_mask_path"]).convert("L")
         export_prefix = "passport"
     else:
@@ -697,6 +707,8 @@ def get_final_passport_image(
             raise HTTPException(status_code=400, detail="Background removal has not been run yet. Please choose 'Remove Background' first.")
         src_img = Image.open(session["original_path"])
         src_img = ImageOps.exif_transpose(src_img)
+        if src_img.mode != "RGB":
+            src_img = src_img.convert("RGB")
         src_mask = Image.open(session["mask_path"]).convert("L")
         export_prefix = "export"
 

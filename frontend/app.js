@@ -1584,9 +1584,11 @@ document.addEventListener("DOMContentLoaded", () => {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, sheetW, sheetH);
 
-    // Compute grid
-    const aspect = memoryCache.activeRatioVal || (35.0 / 45.0);
-    const grid = calculatePrintGrid(sheetW, sheetH, pl.marginPx, pl.spacingPx, aspect);
+    // Compute grid using exact passport photo aspect ratio
+    const passportAspect = (passportPreviewCanvas && passportPreviewCanvas.height > 0)
+      ? (passportPreviewCanvas.width / passportPreviewCanvas.height)
+      : (memoryCache.activeRatioVal || (35.0 / 45.0));
+    const grid = calculatePrintGrid(sheetW, sheetH, pl.marginPx, pl.spacingPx, passportAspect);
     pl.cols = grid.cols;
     pl.rows = grid.rows;
     pl.maxFit = grid.count;
@@ -1602,30 +1604,31 @@ document.addEventListener("DOMContentLoaded", () => {
     if (printRatioLabel) printRatioLabel.textContent = `${memoryCache.activeRatioName} (Aspect Locked)`;
     if (sheetDimTag) sheetDimTag.textContent = `${isPortrait ? "Portrait 4 × 6 in (1200 × 1800 px)" : "Landscape 6 × 4 in (1800 × 1200 px)"} • 300 DPI`;
 
-    // Scale printSheetPaperCard to strictly fit the available viewport with exact page aspect ratio (zero excess white area)
-    if (printSheetPaperCard) {
+    // Scale printSheetPaperCard and printSheetCanvas to strictly fit the available viewport with exact page aspect ratio (zero distortion)
+    if (printSheetPaperCard && printSheetCanvas) {
       printSheetPaperCard.classList.toggle("landscape-sheet", !isPortrait);
       const container = printSheetCanvasArea || printSheetPaperCard.parentElement;
       if (container) {
-        const rect = container.getBoundingClientRect();
-        if (rect.width > 0 && rect.height > 0) {
-          const pad = 32;
-          const maxW = Math.max(100, rect.width - pad);
-          const maxH = Math.max(100, rect.height - pad);
-          const sheetAspect = isPortrait ? (4 / 6) : (6 / 4);
+        const computed = window.getComputedStyle(container);
+        const padX = (parseFloat(computed.paddingLeft) || 0) + (parseFloat(computed.paddingRight) || 0);
+        const padY = (parseFloat(computed.paddingTop) || 0) + (parseFloat(computed.paddingBottom) || 0);
+        const availW = Math.max(100, Math.floor(container.clientWidth - padX - 16));
+        const availH = Math.max(100, Math.floor(container.clientHeight - padY - 16));
+        const sheetAspect = sheetW / sheetH; // Strictly 1.5 in landscape (1800/1200), 0.66667 in portrait (1200/1800)
 
-          let targetW, targetH;
-          if (maxW / maxH > sheetAspect) {
-            targetH = maxH;
-            targetW = targetH * sheetAspect;
-          } else {
-            targetW = maxW;
-            targetH = targetW / sheetAspect;
-          }
-
-          printSheetPaperCard.style.width = `${Math.round(targetW)}px`;
-          printSheetPaperCard.style.height = `${Math.round(targetH)}px`;
+        let targetW, targetH;
+        if (availW / availH > sheetAspect) {
+          targetH = availH;
+          targetW = Math.round(targetH * sheetAspect);
+        } else {
+          targetW = availW;
+          targetH = Math.round(targetW / sheetAspect);
         }
+
+        printSheetCanvas.style.width = `${targetW}px`;
+        printSheetCanvas.style.height = `${targetH}px`;
+        printSheetPaperCard.style.width = `${targetW}px`;
+        printSheetPaperCard.style.height = `${targetH}px`;
       }
     }
 
@@ -1774,67 +1777,77 @@ document.addEventListener("DOMContentLoaded", () => {
       const pl = memoryCache.printLayout;
       const cn = memoryCache.cropNorm;
 
-      // Try server high-res 300 DPI export
-      if (memoryCache.sessionId) {
-        try {
-          const formData = new FormData();
-          formData.append("session_id", memoryCache.sessionId);
-          formData.append("copies", pl.copies);
-          formData.append("orientation", pl.orientation);
-          formData.append("border_px", pl.borderPx);
-          formData.append("spacing_px", pl.spacingPx);
-          formData.append("margin_px", pl.marginPx);
-          formData.append("bg_type", memoryCache.bgMode === "original" ? "original" : memoryCache.activeBgChoice);
-          if (memoryCache.bgMode === "remove" && memoryCache.activeBgChoice === "custom") {
-            const opacityHex = Math.round((memoryCache.activeCustomOpacity / 100) * 255)
-              .toString(16)
-              .padStart(2, "0");
-            formData.append("custom_color", memoryCache.activeCustomColor + opacityHex);
-          }
-          formData.append("crop_x_norm", cn.x);
-          formData.append("crop_y_norm", cn.y);
-          formData.append("crop_w_norm", cn.w);
-          formData.append("crop_h_norm", cn.h);
-          if (memoryCache.bgMode === "remove" && memoryCache.maskEdited && memoryCache.subjectCanvas) {
-            const maskUrl = getMaskDataUrl(memoryCache.subjectCanvas);
-            if (maskUrl) formData.append("edited_mask", maskUrl);
-          }
-
-          const resp = await fetch("/api/photo/export-4x6", {
-            method: "POST",
-            body: formData,
-          });
-          const data = await resp.json();
-          if (resp.ok && data.download_url) {
-            const tempLink = document.createElement("a");
-            tempLink.href = data.download_url;
-            tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
-            document.body.appendChild(tempLink);
-            tempLink.click();
-            document.body.removeChild(tempLink);
-            return;
-          }
-        } catch (serverErr) {
-          console.warn("Server 4x6 export failed, falling back to client 300 DPI canvas export:", serverErr);
-        }
-      }
-
-      // Fast, pristine client-side 300 DPI canvas export fallback
       try {
-        updatePrintSheetPreview();
-        printSheetCanvas.toBlob((blob) => {
-          if (!blob) throw new Error("Canvas export failed");
-          const url = URL.createObjectURL(blob);
-          const tempLink = document.createElement("a");
-          tempLink.href = url;
-          tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
-          document.body.appendChild(tempLink);
-          tempLink.click();
-          document.body.removeChild(tempLink);
-          URL.revokeObjectURL(url);
-        }, "image/png");
-      } catch (clientErr) {
-        showError(clientErr.message || "Failed to export 4x6 print sheet.");
+        let downloaded = false;
+
+        // Try server high-res 300 DPI export
+        if (memoryCache.sessionId) {
+          try {
+            const formData = new FormData();
+            formData.append("session_id", memoryCache.sessionId);
+            formData.append("copies", pl.copies);
+            formData.append("orientation", pl.orientation);
+            formData.append("border_px", pl.borderPx);
+            formData.append("spacing_px", pl.spacingPx);
+            formData.append("margin_px", pl.marginPx);
+            formData.append("bg_type", memoryCache.bgMode === "original" ? "original" : memoryCache.activeBgChoice);
+            if (memoryCache.bgMode === "remove" && memoryCache.activeBgChoice === "custom") {
+              const opacityHex = Math.round((memoryCache.activeCustomOpacity / 100) * 255)
+                .toString(16)
+                .padStart(2, "0");
+              formData.append("custom_color", memoryCache.activeCustomColor + opacityHex);
+            }
+            formData.append("crop_x_norm", cn.x);
+            formData.append("crop_y_norm", cn.y);
+            formData.append("crop_w_norm", cn.w);
+            formData.append("crop_h_norm", cn.h);
+            if (memoryCache.bgMode === "remove" && memoryCache.maskEdited && memoryCache.subjectCanvas) {
+              const maskUrl = getMaskDataUrl(memoryCache.subjectCanvas);
+              if (maskUrl) formData.append("edited_mask", maskUrl);
+            }
+
+            const resp = await fetch("/api/photo/export-4x6", {
+              method: "POST",
+              body: formData,
+            });
+            const data = await resp.json();
+            if (resp.ok && data.download_url) {
+              const tempLink = document.createElement("a");
+              tempLink.href = data.download_url;
+              tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
+              document.body.appendChild(tempLink);
+              tempLink.click();
+              document.body.removeChild(tempLink);
+              downloaded = true;
+            }
+          } catch (serverErr) {
+            console.warn("Server 4x6 export failed, falling back to client 300 DPI canvas export:", serverErr);
+          }
+        }
+
+        // Fast client-side 300 DPI canvas export fallback if server didn't complete
+        if (!downloaded && printSheetCanvas) {
+          updatePrintSheetPreview();
+          await new Promise((resolve, reject) => {
+            printSheetCanvas.toBlob((blob) => {
+              if (!blob) {
+                reject(new Error("Canvas export failed"));
+                return;
+              }
+              const url = URL.createObjectURL(blob);
+              const tempLink = document.createElement("a");
+              tempLink.href = url;
+              tempLink.setAttribute("download", `snap2print_4x6_${pl.orientation}_${pl.copies}copies.png`);
+              document.body.appendChild(tempLink);
+              tempLink.click();
+              document.body.removeChild(tempLink);
+              URL.revokeObjectURL(url);
+              resolve();
+            }, "image/png");
+          });
+        }
+      } catch (err) {
+        showError(err.message || "Failed to export 4x6 print sheet.");
       } finally {
         btnDownload4x6.classList.remove("disabled");
         if (download4x6Spinner) download4x6Spinner.classList.add("hidden");
@@ -2077,4 +2090,10 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   toastClose.addEventListener("click", hideError);
+
+  window.addEventListener("resize", () => {
+    if (memoryCache.currentViewMode === "print") {
+      updatePrintSheetPreview();
+    }
+  });
 });

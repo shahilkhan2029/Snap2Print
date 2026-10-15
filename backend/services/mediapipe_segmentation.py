@@ -82,19 +82,27 @@ class MediaPipeSegmentationBackend:
         import cv2
         import mediapipe as mp
 
-        orig_w, orig_h = image.size
+        # Step 1: Ensure image is 3-channel RGB (MediaPipe SRGB requires exactly 3 channels: R, G, B)
+        rgb_image = image.convert("RGB") if image.mode != "RGB" else image
+
+        orig_w, orig_h = rgb_image.size
         t0 = time.time()
 
-        # Step 1: Scale if image is excessively large to keep inference sub-50ms
+        # Step 2: Scale if image is excessively large to keep inference sub-50ms
         scale = min(seg_resolution / max(orig_w, orig_h), 1.0)
         inf_w = max(int(orig_w * scale), 32)
         inf_h = max(int(orig_h * scale), 32)
         if (inf_w, inf_h) != (orig_w, orig_h):
-            img_for_inf = image.resize((inf_w, inf_h), Image.Resampling.BILINEAR)
+            img_for_inf = rgb_image.resize((inf_w, inf_h), Image.Resampling.BILINEAR)
         else:
-            img_for_inf = image
+            img_for_inf = rgb_image
 
         rgb_np = np.array(img_for_inf, dtype=np.uint8)
+        if rgb_np.ndim == 2:
+            rgb_np = np.stack([rgb_np] * 3, axis=-1)
+        elif rgb_np.ndim == 3 and rgb_np.shape[2] == 4:
+            rgb_np = rgb_np[:, :, :3]
+
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_np)
 
         # Step 2: Run inference

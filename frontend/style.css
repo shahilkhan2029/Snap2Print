@@ -2323,9 +2323,6 @@ input[type="text"]#colorHexInput {
 /* Realistic 4x6 Photo Paper Sheet (Exact 1:1 match to physical page area) */
 .print-sheet-paper-card {
   position: relative;
-  aspect-ratio: 4 / 6;
-  max-width: 96%;
-  max-height: 96%;
   background: #ffffff;
   border: 1px solid #94a3b8;
   border-radius: 2px;
@@ -2333,21 +2330,18 @@ input[type="text"]#colorHexInput {
     0 20px 48px rgba(0, 0, 0, 0.8),
     0 4px 14px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.12);
-  display: block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
   box-sizing: border-box;
   margin: auto;
-  transition: width 0.15s ease, height 0.15s ease;
-}
-
-.print-sheet-paper-card.landscape-sheet {
-  aspect-ratio: 6 / 4;
 }
 
 .print-sheet-canvas {
-  width: 100% !important;
-  height: 100% !important;
   display: block;
+  max-width: 100%;
+  max-height: 100%;
   background: #ffffff;
 }
 
