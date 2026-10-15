@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Snap2Print - Studio Photo Processing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+            <circle cx="12" cy="13" r="4"></circle>
+          </svg>
+        </div>
+        <div class="brand-info">
+          <h1>Snap2Print <span class="badge">Instant Pro</span></h1>
+          <p class="tagline">Decoupled AI Segmentation & Zero-Latency Compositing</p>
+        </div>
+      </div>
+
+      <div class="header-status">
+        <div class="status-indicator">
+          <span class="pulse-dot"></span>
+          <span class="status-text" id="engineStatus">Ready (Local CPU)</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+      <!-- Left Column: Controls & Pipeline Options -->
+      <aside class="sidebar">
+
+        <!-- Upload Panel -->
+        <div class="panel-card upload-card">
+          <div class="card-header">
+            <h3>Customer Photo</h3>
+            <span class="step-badge">STEP 1 & 2</span>
+          </div>
+
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,image/bmp" hidden>
+            <div class="dropzone-content" id="dropzoneContent">
+              <div class="upload-icon-circle">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="17 8 12 3 7 8"></polyline>
+                  <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+              </div>
+              <p class="dropzone-title">Drag customer photo here</p>
+              <p class="dropzone-subtitle">or <button type="button" class="btn-link" id="browseBtn">browse files</button></p>
+              <span class="format-hint">JPG, PNG, WEBP (Max 25MB)</span>
+            </div>
+            <div class="file-info-bar hidden" id="fileInfoBar">
+              <div class="file-meta">
+                <span class="file-name" id="fileName">portrait.jpg</span>
+                <span class="file-size-badge" id="fileSize">--</span>
+              </div>
+              <button type="button" class="btn-icon" id="clearFileBtn" title="Remove image">&times;</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Segmentation & Method Selection -->
+        <div class="panel-card">
+          <div class="card-header">
+            <h3>Stage A: AI Segmentation</h3>
+            <span class="step-badge">STEP 3</span>
+          </div>
+
+          <!-- Method Badge Indicator -->
+          <div class="method-banner hidden" id="methodBanner">
+            <span class="method-icon" id="methodIcon">⚡</span>
+            <div class="method-text-col">
+              <span class="method-label" id="methodLabel">Engine: BiRefNet-Portrait</span>
+              <span class="method-sub" id="methodSub">Studio high-precision portrait matting</span>
+            </div>
+          </div>
+
+          <!-- Advanced Collapsible Settings -->
+          <details class="advanced-details">
+            <summary class="advanced-summary">Advanced Settings</summary>
+            <div class="advanced-body">
+              <label class="setting-row">
+                <span class="setting-title">Engine Selection:</span>
+                <select id="methodModeSelect" class="form-select">
+                  <option value="auto" selected>Auto (BiRefNet Portrait or Chroma Key)</option>
+                  <option value="birefnet">Force BiRefNet-Portrait (Studio Quality)</option>
+                  <option value="chroma_key">Force Chroma Key</option>
+                  <option value="u2netp">Force U2NetP (Lightweight Fallback)</option>
+                </select>
+              </label>
+
+              <label class="range-label" for="smoothnessSlider">
+                <span>Edge Softness / Feather:</span>
+                <span id="smoothnessVal" class="val-tag">1.0</span>
+              </label>
+              <input type="range" id="smoothnessSlider" min="0.5" max="2.5" step="0.25" value="1.0">
+
+              <button type="button" class="btn-compare-action" id="compareModelsBtn" disabled>
+                <span>Compare Models (BiRefNet vs U2NetP vs Chroma)</span>
+              </button>
+            </div>
+          </details>
+
+          <!-- Primary Action Button -->
+          <button type="button" class="btn-primary" id="processBtn" disabled>
+            <span class="btn-spinner hidden" id="btnSpinner"></span>
+            <span class="btn-text" id="btnText">Remove Background</span>
+          </button>
+        </div>
+
+        <!-- Choose Studio Background (Stage B: Instant Client-Side Compositing) -->
+        <div class="panel-card">
+          <div class="card-header">
+            <h3>Stage B: Background Choice</h3>
+            <span class="instant-tag">Instant (0 ms API)</span>
+          </div>
+
+          <div class="bg-options-grid">
+            <label class="bg-option-item active" data-bg="transparent">
+              <input type="radio" name="bgChoice" value="transparent" checked>
+              <span class="bg-swatch swatch-transparent"></span>
+              <span class="bg-label">Transparent</span>
+            </label>
+
+            <label class="bg-option-item" data-bg="white">
+              <input type="radio" name="bgChoice" value="white">
+              <span class="bg-swatch swatch-white"></span>
+              <span class="bg-label">Studio White</span>
+            </label>
+
+            <label class="bg-option-item" data-bg="blue">
+              <input type="radio" name="bgChoice" value="blue">
+              <span class="bg-swatch swatch-blue"></span>
+              <span class="bg-label">Passport Blue</span>
+            </label>
+
+            <label class="bg-option-item" data-bg="custom">
+              <input type="radio" name="bgChoice" value="custom">
+              <span class="bg-swatch swatch-custom" id="customColorSwatch"></span>
+              <span class="bg-label">Custom</span>
+            </label>
+          </div>
+
+          <div class="custom-color-picker hidden" id="customColorContainer">
+            <label for="colorPickerInput">Custom Color (Live):</label>
+            <div class="picker-row">
+              <input type="color" id="colorPickerInput" value="#1877f2">
+              <input type="text" id="colorHexInput" value="#1877f2" maxlength="7" spellcheck="false">
+            </div>
+          </div>
+        </div>
+
+        <!-- Advanced Performance Telemetry -->
+        <details class="panel-card debug-card hidden" id="debugCard">
+          <summary class="advanced-summary">Performance Telemetry</summary>
+          <div class="debug-body">
+            <div class="debug-section-title">Latency Telemetry</div>
+            <div class="metric-row">
+              <span class="metric-label">Stage A: AI Inference</span>
+              <span class="metric-value" id="dbgSeg">-- ms</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Stage A: Mask Refine</span>
+              <span class="metric-value" id="dbgRefine">-- ms</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label highlight">Stage B: Color Swap (Local)</span>
+              <span class="metric-value highlight" id="dbgColorLatency">0 ms</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Final Export (Native)</span>
+              <span class="metric-value" id="dbgExport">On Click</span>
+            </div>
+            <div class="debug-section-title">Resolution</div>
+            <div class="metric-row">
+              <span class="metric-label">Preview Resolution</span>
+              <span class="metric-value" id="dbgPreviewRes">-- x --</span>
+            </div>
+            <div class="metric-row">
+              <span class="metric-label">Full Export Resolution</span>
+              <span class="metric-value" id="dbgExportRes">-- x --</span>
+            </div>
+          </div>
+        </details>
+      </aside>
+
+      <!-- Right Column: Studio Viewport -->
+      <section class="preview-area">
+        <!-- Viewport Top Bar -->
+        <div class="preview-header">
+          <div class="view-mode-tabs">
+            <button type="button" class="tab-btn" data-mode="original" id="tabOriginal">Original</button>
+            <button type="button" class="tab-btn" data-mode="processed" id="tabProcessed">Processed</button>
+            <button type="button" class="tab-btn active" data-mode="split" id="tabSplit">Split View</button>
+            <button type="button" class="tab-btn hidden" data-mode="compare" id="tabCompare">Compare View</button>
+          </div>
+
+          <div class="preview-actions">
+            <button type="button" id="downloadBtn" class="btn-download disabled">
+              <span class="btn-spinner hidden" id="downloadSpinner"></span>
+              <svg id="downloadIcon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              <span id="downloadBtnText">Download Full Res</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Viewport Canvas Container -->
+        <div class="preview-viewport">
+          <!-- Non-blocking Processing Overlay (Shows ONLY during initial Stage A AI run) -->
+          <div class="processing-overlay hidden" id="processingOverlay">
+            <div class="processing-card">
+              <div class="radar-spinner"></div>
+              <p class="processing-state-msg" id="processingStateMsg">Analyzing photo...</p>
+              <div class="progress-track">
+                <div class="progress-fill" id="progressFill"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div class="empty-state" id="emptyState">
+            <div class="empty-icon">
+              <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <circle cx="8.5" cy="8.5" r="1.5"></circle>
+                <polyline points="21 15 16 10 5 21"></polyline>
+              </svg>
+            </div>
+            <h4>No Photo Loaded</h4>
+            <p>Upload a customer photo on the left. Snap2Print runs AI segmentation once, enabling instant background color selection.</p>
+          </div>
+
+          <!-- Dual Independent Render Panels -->
+          <div class="dual-panel-container hidden" id="dualPanelContainer">
+            <!-- Left Panel: Original -->
+            <div class="studio-panel" id="panelOriginal">
+              <div class="panel-tag">ORIGINAL</div>
+              <div class="img-frame">
+                <img id="imgOriginal" alt="Original Photo">
+              </div>
+            </div>
+
+            <!-- Right Panel: Processed (Layered for Instant Zero-Lag Browser Compositing) -->
+            <div class="studio-panel" id="panelProcessed">
+              <div class="panel-tag">PROCESSED (LIVE COMPOSITED)</div>
+              <div class="img-frame" id="processedCompositeFrame">
+                <img id="imgProcessed" class="subject-fg-layer" alt="Processed Result">
+              </div>
+            </div>
+          </div>
+
+          <!-- Model Comparison Grid Container (Advanced Mode) -->
+          <div class="comparison-grid-container hidden" id="comparisonGridContainer">
+            <div class="compare-card" id="cardCmpBiRefNet">
+              <div class="compare-card-header">
+                <span class="compare-title">BiRefNet-Portrait</span>
+                <span class="compare-time" id="cmpTimeB">-- ms</span>
+              </div>
+              <div class="img-frame">
+                <img id="imgCmpB" alt="BiRefNet Result">
+              </div>
+              <div class="compare-meta" id="cmpMetaB">Res: 1024x1024 • Studio Quality</div>
+            </div>
+
+            <div class="compare-card" id="cardCmpU2NetP">
+              <div class="compare-card-header">
+                <span class="compare-title">U2NetP (Lightweight)</span>
+                <span class="compare-time" id="cmpTimeU">-- ms</span>
+              </div>
+              <div class="img-frame">
+                <img id="imgCmpU" alt="U2NetP Result">
+              </div>
+              <div class="compare-meta" id="cmpMetaU">Res: 320x320 • Fast CPU</div>
+            </div>
+
+            <div class="compare-card" id="cardCmpChroma">
+              <div class="compare-card-header">
+                <span class="compare-title">Chroma Key</span>
+                <span class="compare-time" id="cmpTimeC">-- ms</span>
+              </div>
+              <div class="img-frame">
+                <img id="imgCmpC" alt="Chroma Key Result">
+              </div>
+              <div class="compare-meta" id="cmpMetaC">Color Distance • Uniform backdrops</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Notification Toasts -->
+        <div class="toast-error hidden" id="errorToast">
+          <span id="errorMessage">Error</span>
+          <button type="button" class="toast-close" id="toastClose">&times;</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
