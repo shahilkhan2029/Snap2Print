@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <div class="app-shell">
@@ -39,11 +39,11 @@
       <!-- Left Column: Controls & Pipeline Options -->
       <aside class="sidebar">
 
-        <!-- Upload Panel -->
+        <!-- Step 1: Upload Panel -->
         <div class="panel-card upload-card">
           <div class="card-header">
             <h3>Customer Photo</h3>
-            <span class="step-badge">STEP 1 & 2</span>
+            <span class="step-badge">STEP 1</span>
           </div>
 
           <div class="dropzone" id="dropzone">
@@ -58,7 +58,7 @@
               </div>
               <p class="dropzone-title">Drag customer photo here</p>
               <p class="dropzone-subtitle">or <button type="button" class="btn-link" id="browseBtn">browse files</button></p>
-              <span class="format-hint">JPG, PNG, WEBP (Max 25MB)</span>
+              <span class="format-hint">JPG, PNG, WEBP (Single or Group)</span>
             </div>
             <div class="file-info-bar hidden" id="fileInfoBar">
               <div class="file-meta">
@@ -70,96 +70,238 @@
           </div>
         </div>
 
-        <!-- Segmentation & Method Selection -->
-        <div class="panel-card">
+        <!-- Step 2 & 3: Select Person Panel -->
+        <div class="panel-card hidden" id="personSelectCard">
           <div class="card-header">
-            <h3>Stage A: AI Segmentation</h3>
-            <span class="step-badge">STEP 3</span>
+            <h3>Select Person</h3>
+            <span class="step-badge">STEP 2 & 3</span>
           </div>
-
-          <!-- Method Badge Indicator -->
-          <div class="method-banner hidden" id="methodBanner">
-            <span class="method-icon" id="methodIcon">⚡</span>
-            <div class="method-text-col">
-              <span class="method-label" id="methodLabel">Engine: BiRefNet-Portrait</span>
-              <span class="method-sub" id="methodSub">Studio high-precision portrait matting</span>
-            </div>
+          <p class="panel-instruction">Select which person to create the passport photo for:</p>
+          <div class="person-chips-grid" id="personChipsList">
+            <!-- Dynamic face chips rendered by JS -->
           </div>
-
-          <!-- Advanced Collapsible Settings -->
-          <details class="advanced-details">
-            <summary class="advanced-summary">Advanced Settings</summary>
-            <div class="advanced-body">
-              <label class="setting-row">
-                <span class="setting-title">Engine Selection:</span>
-                <select id="methodModeSelect" class="form-select">
-                  <option value="auto" selected>Auto: Fast AI / Chroma Key (Recommended)</option>
-                  <option value="mediapipe">MediaPipe Fast AI (Instant ~0.1s)</option>
-                  <option value="birefnet">BiRefNet-Portrait (Studio Quality — Higher CPU)</option>
-                  <option value="chroma_key">Force Chroma Key (Green/Blue Screen)</option>
-                  <option value="u2netp">Force U2NetP (Legacy Fallback)</option>
-                </select>
-              </label>
-
-              <label class="range-label" for="smoothnessSlider">
-                <span>Edge Softness / Feather:</span>
-                <span id="smoothnessVal" class="val-tag">1.0</span>
-              </label>
-              <input type="range" id="smoothnessSlider" min="0.5" max="2.5" step="0.25" value="1.0">
-
-              <button type="button" class="btn-compare-action" id="compareModelsBtn" disabled>
-                <span>Compare Engines (MediaPipe vs BiRefNet vs U2NetP vs Chroma)</span>
-              </button>
-            </div>
-          </details>
-
-          <!-- Primary Action Button -->
-          <button type="button" class="btn-primary" id="processBtn" disabled>
-            <span class="btn-spinner hidden" id="btnSpinner"></span>
-            <span class="btn-text" id="btnText">Remove Background</span>
-          </button>
         </div>
 
-        <!-- Choose Studio Background (Stage B: Instant Client-Side Compositing) -->
-        <div class="panel-card">
+        <!-- Step 4: AI Auto-Crop & Manual Framing Panel -->
+        <div class="panel-card hidden" id="cropControlsCard">
           <div class="card-header">
-            <h3>Stage B: Background Choice</h3>
-            <span class="instant-tag">Instant (0 ms API)</span>
+            <h3>Passport Crop</h3>
+            <span class="step-badge">STEP 4</span>
           </div>
 
-          <div class="bg-options-grid">
-            <label class="bg-option-item active" data-bg="transparent">
-              <input type="radio" name="bgChoice" value="transparent" checked>
-              <span class="bg-swatch swatch-transparent"></span>
-              <span class="bg-label">Transparent</span>
-            </label>
-
-            <label class="bg-option-item" data-bg="white">
-              <input type="radio" name="bgChoice" value="white">
-              <span class="bg-swatch swatch-white"></span>
-              <span class="bg-label">Studio White</span>
-            </label>
-
-            <label class="bg-option-item" data-bg="blue">
-              <input type="radio" name="bgChoice" value="blue">
-              <span class="bg-swatch swatch-blue"></span>
-              <span class="bg-label">Passport Blue</span>
-            </label>
-
-            <label class="bg-option-item" data-bg="custom">
-              <input type="radio" name="bgChoice" value="custom">
-              <span class="bg-swatch swatch-custom" id="customColorSwatch"></span>
-              <span class="bg-label">Custom</span>
-            </label>
-          </div>
-
-          <div class="custom-color-picker hidden" id="customColorContainer">
-            <label for="colorPickerInput">Custom Color (Live):</label>
-            <div class="picker-row">
-              <input type="color" id="colorPickerInput" value="#1877f2">
-              <input type="text" id="colorHexInput" value="#1877f2" maxlength="7" spellcheck="false">
+          <!-- Aspect Ratio Selection -->
+          <div class="crop-setting-group">
+            <label class="setting-title" for="aspectRatioSelect">Passport Size / Aspect Ratio:</label>
+            <div class="ratio-pill-group" id="ratioPillGroup">
+              <button type="button" class="ratio-pill active" data-ratio="35:45">Standard (35×45 mm)</button>
+              <button type="button" class="ratio-pill" data-ratio="1:1">US (2×2 in)</button>
+              <button type="button" class="ratio-pill" data-ratio="3:4">Visa (3:4)</button>
             </div>
           </div>
+
+          <!-- Manual Crop Tools -->
+          <div class="crop-tools-bar">
+            <button type="button" class="btn-tool" id="resetCropBtn" title="Reset crop to AI calculation">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path></svg>
+              <span>Reset Auto-Crop</span>
+            </button>
+            <div class="zoom-tools">
+              <button type="button" class="btn-tool-icon" id="zoomInBtn" title="Zoom In (Tighter crop)">＋</button>
+              <button type="button" class="btn-tool-icon" id="zoomOutBtn" title="Zoom Out (Wider crop)">－</button>
+            </div>
+          </div>
+
+          <p class="crop-hint">
+            💡 <strong>Live Synchronization:</strong> Drag the frame on the photo to reposition. Corner handles scale dimensions. The preview on the right updates instantly.
+          </p>
+        </div>
+
+        <!-- Step 5: Background Choice (Keep Original vs Remove Background) -->
+        <div class="panel-card hidden" id="backgroundChoiceCard">
+          <div class="card-header">
+            <h3>Background</h3>
+            <span class="step-badge">STEP 5</span>
+          </div>
+
+          <!-- Mode Toggle: Keep Original Background vs Remove Background -->
+          <div class="bg-mode-toggle" id="bgModeToggle">
+            <button type="button" class="bg-mode-btn active" id="btnKeepOriginalBg" data-mode="original">
+              <span class="mode-icon">📷</span>
+              <div class="mode-text">
+                <span class="mode-title">Keep Original</span>
+                <span class="mode-desc">Default • No AI Inference</span>
+              </div>
+            </button>
+            <button type="button" class="bg-mode-btn" id="btnRemoveBg" data-mode="remove">
+              <span class="mode-icon">✂️</span>
+              <div class="mode-text">
+                <span class="mode-title">Remove Background</span>
+                <span class="mode-desc">Studio Color Backdrop</span>
+              </div>
+            </button>
+          </div>
+
+          <!-- Original Background Active State Note -->
+          <div class="original-bg-info" id="originalBgInfo">
+            <div class="info-pill-badge">
+              <span class="badge-dot-green"></span>
+              <span>Original Photo Background Retained</span>
+            </div>
+            <p class="bg-mode-hint">Fastest export. Zero unnecessary AI processing. Switch to "Remove Background" if you need a white, blue, or custom color backdrop.</p>
+          </div>
+
+          <!-- Studio Color Replacement Controls (Shown only when Remove Background is active) -->
+          <div class="remove-bg-controls hidden" id="removeBgControls">
+            <!-- Action to run AI background removal on cropped person -->
+            <button type="button" class="btn-primary btn-run-bg" id="runBgRemovalBtn">
+              <span class="btn-spinner hidden" id="runBgSpinner"></span>
+              <span class="btn-text" id="runBgBtnText">⚡ Run Background Removal on Crop</span>
+            </button>
+
+            <!-- Method Badge Indicator -->
+            <div class="method-banner hidden" id="methodBanner">
+              <span class="method-icon" id="methodIcon">⚡</span>
+              <div class="method-text-col">
+                <span class="method-label" id="methodLabel">Engine: MediaPipe Selfie (Fast CPU)</span>
+                <span class="method-sub" id="methodSub">Portrait segmentation on cropped subject</span>
+              </div>
+            </div>
+
+            <div class="bg-options-grid" id="bgSwatchesGrid">
+              <label class="bg-option-item active" data-bg="transparent">
+                <input type="radio" name="bgChoice" value="transparent" checked>
+                <span class="bg-swatch swatch-transparent"></span>
+                <span class="bg-label">Transparent</span>
+              </label>
+
+              <label class="bg-option-item" data-bg="white">
+                <input type="radio" name="bgChoice" value="white">
+                <span class="bg-swatch swatch-white"></span>
+                <span class="bg-label">Studio White</span>
+              </label>
+
+              <label class="bg-option-item" data-bg="blue">
+                <input type="radio" name="bgChoice" value="blue">
+                <span class="bg-swatch swatch-blue"></span>
+                <span class="bg-label">Passport Blue</span>
+              </label>
+
+              <label class="bg-option-item" data-bg="custom">
+                <input type="radio" name="bgChoice" value="custom">
+                <span class="bg-swatch swatch-custom" id="customColorSwatch"></span>
+                <span class="bg-label">Custom</span>
+              </label>
+            </div>
+
+            <div class="custom-color-picker hidden" id="customColorContainer">
+              <label for="colorPickerInput">Custom Color (Live):</label>
+              <div class="picker-row">
+                <input type="color" id="colorPickerInput" value="#1877f2">
+                <input type="text" id="colorHexInput" value="#1877f2" maxlength="7" spellcheck="false">
+              </div>
+              <div class="color-opacity-row">
+                <div class="color-opacity-header">
+                  <span class="color-opacity-label">Opacity:</span>
+                  <span class="range-val" id="colorOpacityVal">100%</span>
+                </div>
+                <input type="range" id="colorOpacitySlider" min="0" max="100" step="1" value="100">
+              </div>
+            </div>
+
+            <!-- Manual Retouch / Eraser Tool (Studio Quality) -->
+            <div class="eraser-tool-card" id="eraserToolCard">
+              <div class="eraser-header">
+                <span class="eraser-title">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="m18 13-6 6a2 2 0 0 1-2.83 0l-5.66-5.66a2 2 0 0 1 0-2.83l8.49-8.49a2 2 0 0 1 2.83 0l3.17 3.17a2 2 0 0 1 0 2.83L13 13"></path>
+                    <path d="M14 6l4 4"></path>
+                    <path d="m5 21 14 0"></path>
+                  </svg>
+                  Manual Eraser Tool
+                </span>
+                <button type="button" class="btn-toggle-eraser" id="btnToggleEraser">
+                  <span id="eraserToggleText">Enable Eraser</span>
+                </button>
+              </div>
+
+              <div class="eraser-body hidden" id="eraserControlsBody">
+                <div class="eraser-row">
+                  <div class="eraser-slider-header">
+                    <label for="eraserSizeSlider">Brush Size:</label>
+                    <span class="range-val" id="eraserSizeVal">25 px</span>
+                  </div>
+                  <input type="range" id="eraserSizeSlider" min="5" max="100" step="1" value="25">
+                </div>
+
+                <div class="eraser-row">
+                  <div class="eraser-slider-header">
+                    <label for="eraserHardnessSlider">Brush Hardness:</label>
+                    <span class="range-val" id="eraserHardnessVal">Soft (40%)</span>
+                  </div>
+                  <input type="range" id="eraserHardnessSlider" min="0" max="100" step="5" value="40">
+                </div>
+
+                <div class="eraser-actions-row">
+                  <button type="button" class="btn-eraser-action" id="btnEraserUndo" title="Undo (Ctrl+Z)" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                    Undo
+                  </button>
+                  <button type="button" class="btn-eraser-action" id="btnEraserRedo" title="Redo (Ctrl+Y)" disabled>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                    Redo
+                  </button>
+                  <button type="button" class="btn-eraser-action btn-danger-action" id="btnEraserReset" title="Reset back to AI mask">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    Reset
+                  </button>
+                </div>
+
+                <div class="eraser-hint">
+                  <span>💡 Drag on preview to erase background fringes.</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Edge softness & Engine settings -->
+            <details class="advanced-details">
+              <summary class="advanced-summary">Advanced AI Settings</summary>
+              <div class="advanced-body">
+                <label class="setting-row">
+                  <span class="setting-title">Engine Selection:</span>
+                  <select id="methodModeSelect" class="form-select">
+                    <option value="auto" selected>Auto: Fast AI / Chroma Key (Recommended)</option>
+                    <option value="mediapipe">MediaPipe Fast AI (Instant ~0.1s)</option>
+                    <option value="birefnet">BiRefNet-Portrait (Studio Quality)</option>
+                    <option value="chroma_key">Force Chroma Key (Green/Blue Screen)</option>
+                    <option value="u2netp">Force U2NetP (Legacy Fallback)</option>
+                  </select>
+                </label>
+
+                <label class="range-label" for="smoothnessSlider">
+                  <span>Edge Softness / Feather:</span>
+                  <span id="smoothnessVal" class="val-tag">1.0</span>
+                </label>
+                <input type="range" id="smoothnessSlider" min="0.5" max="2.5" step="0.25" value="1.0">
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <!-- Step 6 & 7: Export / Download Panel -->
+        <div class="panel-card export-card hidden" id="exportCard">
+          <div class="card-header">
+            <h3>Export Passport</h3>
+            <span class="step-badge">STEP 6 & 7</span>
+          </div>
+          <button type="button" class="btn-primary btn-download-panel" id="downloadPanelBtn">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Download Passport Photo</span>
+          </button>
+          <span class="safe-note">Exports at native camera resolution with exact passport framing.</span>
         </div>
 
         <!-- Advanced Performance Telemetry -->
@@ -248,28 +390,55 @@
 
           <!-- Dual Independent Render Panels -->
           <div class="dual-panel-container hidden" id="dualPanelContainer">
-            <!-- Left Panel: Original -->
+            <!-- Left Panel: Original Image with Multi-Face Selection & Interactive Crop Box -->
             <div class="studio-panel" id="panelOriginal">
-              <div class="panel-tag">ORIGINAL</div>
-              <div class="img-frame">
-                <img id="imgOriginal" alt="Original Photo">
-              </div>
-            </div>
-
-            <!-- Right Panel: Processed (Layered for Instant Zero-Lag Browser Compositing) -->
-            <div class="studio-panel" id="panelProcessed">
               <div class="panel-tag">
-                <span>PROCESSED (LIVE COMPOSITED)</span>
-                <!-- Small status: Face detected or No face detected (Task 1) -->
+                <span>1. ORIGINAL & CROP FRAMING</span>
                 <span class="face-badge hidden" id="faceStatusBadge">
                   <span class="face-badge-dot" id="faceBadgeDot"></span>
                   <span id="faceBadgeText">Face detected</span>
                 </span>
               </div>
-              <div class="img-frame" id="processedCompositeFrame">
-                <img id="imgProcessed" class="subject-fg-layer" alt="Processed Result">
-                <!-- Multi-Face Overlays Container (Renders all detected faces) -->
+              <div class="img-frame" id="originalFrame">
+                <img id="imgOriginal" alt="Original Photo">
+                <!-- Multi-Face Overlays Container (Renders numbered face boxes: Face 1, Face 2, ...) -->
                 <div class="face-overlays-container" id="faceOverlaysContainer"></div>
+                <!-- Interactive Passport Crop Overlay Box -->
+                <div class="crop-overlay-wrapper hidden" id="cropOverlayWrapper">
+                  <div class="crop-scrim" id="cropScrim"></div>
+                  <div class="crop-box" id="cropBox">
+                    <div class="crop-box-badge" id="cropBoxBadge">Passport 35:45</div>
+                    <!-- Passport Alignment Guidelines -->
+                    <div class="crop-guide guide-eye" title="Recommended eye line position (40% from top)">
+                      <span class="guide-label">Eye Line</span>
+                    </div>
+                    <div class="crop-guide guide-chin" title="Recommended chin line position (70-75% from top)">
+                      <span class="guide-label">Chin Line</span>
+                    </div>
+                    <!-- 4 Corner Resizing Handles -->
+                    <div class="crop-handle handle-nw" data-dir="nw"></div>
+                    <div class="crop-handle handle-ne" data-dir="ne"></div>
+                    <div class="crop-handle handle-se" data-dir="se"></div>
+                    <div class="crop-handle handle-sw" data-dir="sw"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Right Panel: Exact Passport Photo (Live Synchronized Preview) -->
+            <div class="studio-panel" id="panelProcessed">
+              <div class="panel-tag">
+                <span>2. PASSPORT PHOTO (EXACT PREVIEW)</span>
+                <span class="crop-status-badge ready" id="processedStatusBadge">35×45 mm</span>
+              </div>
+              <div class="img-frame passport-viewport-frame" id="processedCompositeFrame">
+                <!-- Real Passport Photo Frame (Strictly maintains selected passport aspect ratio, no stretching, no distortion) -->
+                <div class="passport-photo-card" id="passportPhotoCard">
+                  <!-- Live synchronizing canvas: draws the exact cropped pixels in real-time -->
+                  <canvas id="passportPreviewCanvas" class="passport-preview-canvas"></canvas>
+                  <div class="eraser-brush-cursor hidden" id="eraserBrushCursor"></div>
+                  <div class="passport-spec-tag" id="passportSpecTag">Standard 35×45 mm</div>
+                </div>
               </div>
             </div>
           </div>
@@ -320,6 +489,6 @@
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

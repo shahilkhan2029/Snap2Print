@@ -40,7 +40,14 @@ def composite_studio_background(
         color_rgb = (24, 119, 242) # Standard studio passport blue
     elif bg_type == "custom" and custom_hex:
         clean_hex = custom_hex.lstrip("#")
-        if len(clean_hex) == 6:
+        if len(clean_hex) == 8:
+            try:
+                color_rgba = tuple(int(clean_hex[i : i + 2], 16) for i in (0, 2, 4, 6))
+                background = Image.new("RGBA", (width, height), color_rgba)
+                return Image.alpha_composite(background, rgba_image)
+            except ValueError:
+                color_rgb = (255, 255, 255)
+        elif len(clean_hex) == 6:
             try:
                 color_rgb = tuple(int(clean_hex[i : i + 2], 16) for i in (0, 2, 4))
             except ValueError:
