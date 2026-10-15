@@ -7,7 +7,8 @@ from PIL import Image, ImageDraw
 BASE_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE_DIR))
 
-from backend.services.background_removal import get_background_remover, composite_background
+from backend.services.background_removal import get_background_remover
+from backend.services.image_compositor import composite_studio_background as composite_background
 
 
 def create_dummy_portrait(path: Path):
@@ -43,7 +44,9 @@ def test_pipeline():
     remover = get_background_remover()
 
     print("Running background removal inference...")
-    transparent_img = remover.remove_background(img)
+    raw_mask, _ = remover.segment_mask(img)
+    from backend.services.image_compositor import apply_mask_to_foreground
+    transparent_img = apply_mask_to_foreground(img, raw_mask)
     assert transparent_img.mode == "RGBA", "Output must be RGBA"
     print(f"Transparent image generated successfully: {transparent_img.size}, mode: {transparent_img.mode}")
 

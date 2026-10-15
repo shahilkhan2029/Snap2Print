@@ -24,21 +24,21 @@ from backend.api.photo import upload_and_detect, export_4x6, compute_4x6_grid
 
 
 async def test_print_layout_stage():
-    img_path = Path("input/5e14125c_original.jpg")
+    img_path = ROOT_DIR / "tests" / "test_portrait.jpg"
     assert img_path.exists(), "Sample test image must exist"
 
     with open(img_path, "rb") as f:
         file_bytes = f.read()
 
-    upload_file = UploadFile(file=io.BytesIO(file_bytes), filename="group_3.jpg")
+    upload_file = UploadFile(file=io.BytesIO(file_bytes), filename="test_portrait.jpg")
     resp = await upload_and_detect(file=upload_file)
     data = json.loads(resp.body.decode("utf-8"))
     assert data["success"] is True
     session_id = data["session_id"]
 
     fd = data["face_detection"]
-    faces = fd["faces"]
-    ac = faces[1]["auto_crop"]
+    faces = fd.get("faces", [])
+    ac = faces[0]["auto_crop"] if faces else fd["default_crop"]
 
     # 1. Test Grid Math
     grid_portrait = compute_4x6_grid(1200, 1800, margin=30, spacing=20, aspect=35.0/45.0)

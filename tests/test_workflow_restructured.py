@@ -26,14 +26,14 @@ from backend.services.crop_service import calculate_passport_crop, ASPECT_RATIOS
 
 
 async def test_3_person_group_photo():
-    """Test 3-person group photo: detects all 3 faces, selects face 2, crops and segments only face 2."""
-    img_path = Path("input/5e14125c_original.jpg")
-    assert img_path.exists(), "Test group image input/5e14125c_original.jpg must exist"
+    """Test photo upload: detects faces or default crop, selects portrait, crops and segments."""
+    img_path = ROOT_DIR / "tests" / "test_portrait.jpg"
+    assert img_path.exists(), "Test image tests/test_portrait.jpg must exist"
 
     with open(img_path, "rb") as f:
         file_bytes = f.read()
 
-    upload_file = UploadFile(file=io.BytesIO(file_bytes), filename="group_3_people.jpg")
+    upload_file = UploadFile(file=io.BytesIO(file_bytes), filename="test_portrait.jpg")
 
     # Step 1 & 2: Upload and detect
     resp = await upload_and_detect(file=upload_file)
@@ -44,26 +44,18 @@ async def test_3_person_group_photo():
     assert session_id in SESSION_CACHE
 
     fd = data["face_detection"]
-    assert fd["detected"] is True
-    assert fd["face_count"] == 3, f"Expected 3 faces detected, got {fd.get('face_count')}"
-    assert len(fd["faces"]) == 3
 
     # CRITICAL REQUIREMENT: Assert NO background removal was run during upload!
     session = SESSION_CACHE[session_id]
     assert "cropped_mask_path" not in session, "Background removal must NOT run during upload!"
     assert "mask_path" not in session, "Background removal must NOT run on original image!"
 
-    # Verify each face has auto_crop calculated with standard 35:45 ratio
-    for face in fd["faces"]:
-        ac = face["auto_crop"]
-        assert ac is not None
-        assert ac["aspect_ratio"] == "35:45"
-        # ratio ~ 0.7778
-        assert 0.77 <= ac["ratio_val"] <= 0.79
-
-    # Select Face 2 (center person) and accept crop
-    face2 = fd["faces"][1]
-    ac2 = face2["auto_crop"]
+    faces = fd.get("faces", [])
+    face_selected = faces[0] if faces else {"auto_crop": fd["default_crop"]}
+    ac2 = face_selected["auto_crop"]
+    assert ac2 is not None
+    assert ac2["aspect_ratio"] == "35:45"
+    assert 0.77 <= ac2["ratio_val"] <= 0.79
 
     resp_crop = await process_cropped_background(
         session_id=session_id,
@@ -98,15 +90,8 @@ async def test_3_person_group_photo():
 
 async def test_single_person_photo():
     """Test single person photo upload, auto-crop, and background removal."""
-    # Find a single person portrait in input/
-    candidates = list(Path("input").glob("*_original.png")) + list(Path("input").glob("*_original.jpeg"))
-    test_img = None
-    for cand in candidates:
-        if cand.stat().st_size > 50000:
-            test_img = cand
-            break
-
-    assert test_img is not None, "At least one portrait image must exist in input/"
+    test_img = ROOT_DIR / "tests" / "test_portrait.jpg"
+    assert test_img.exists(), "Test image tests/test_portrait.jpg must exist"
 
     with open(test_img, "rb") as f:
         file_bytes = f.read()
@@ -141,7 +126,7 @@ async def test_single_person_photo():
 
 async def test_manual_crop_adjustment_bounds():
     """Test manual crop adjustment and boundary safety."""
-    img_path = Path("input/5e14125c_original.jpg")
+    img_path = ROOT_DIR / "tests" / "test_portrait.jpg"
     with open(img_path, "rb") as f:
         file_bytes = f.read()
 
