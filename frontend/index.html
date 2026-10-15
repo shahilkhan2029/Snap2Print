@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css?v=5">
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div class="app-shell">
@@ -287,11 +287,105 @@
           </div>
         </div>
 
-        <!-- Step 6 & 7: Export / Download Panel -->
+        <!-- Step 6: Face Enhancement Section -->
+        <div class="panel-card enhancement-card hidden" id="faceEnhancementCard">
+          <div class="card-header">
+            <div class="header-title-group">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3a9 9 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+                <path d="M19 8v4"></path>
+                <path d="M21 10h-4"></path>
+              </svg>
+              <h3>Face Enhancement</h3>
+            </div>
+            <span class="step-badge">STEP 6</span>
+          </div>
+
+          <!-- Enhancement Toggle Row -->
+          <div class="enhancement-toggle-row">
+            <label class="switch-control" for="toggleEnhancement">
+              <input type="checkbox" id="toggleEnhancement">
+              <span class="switch-slider"></span>
+            </label>
+            <span class="toggle-status-label" id="enhancementStatusLabel">Enhancement Disabled</span>
+          </div>
+
+          <!-- Enhancement Controls Body (Enabled only when toggle is on) -->
+          <div class="enhancement-body disabled-panel" id="enhancementBody">
+            <!-- Master Strength Slider -->
+            <div class="enhancement-row master-row">
+              <div class="slider-header">
+                <label for="enhancementStrengthSlider">Enhancement Strength:</label>
+                <span class="range-val highlight-val" id="enhancementStrengthVal">50%</span>
+              </div>
+              <input type="range" id="enhancementStrengthSlider" min="0" max="100" step="1" value="50">
+            </div>
+
+            <!-- Lighting Slider -->
+            <div class="enhancement-row">
+              <div class="slider-header">
+                <label for="enhancementLightingSlider">Lighting / Exposure:</label>
+                <span class="range-val" id="enhancementLightingVal">+10%</span>
+              </div>
+              <input type="range" id="enhancementLightingSlider" min="-50" max="50" step="1" value="10">
+            </div>
+
+            <!-- Skin Smoothing Slider -->
+            <div class="enhancement-row">
+              <div class="slider-header">
+                <label for="enhancementSmoothingSlider">Skin Smoothing:</label>
+                <span class="range-val" id="enhancementSmoothingVal">35%</span>
+              </div>
+              <input type="range" id="enhancementSmoothingSlider" min="0" max="100" step="1" value="35">
+            </div>
+
+            <!-- Blemish/Spot Removal Slider -->
+            <div class="enhancement-row">
+              <div class="slider-header">
+                <label for="enhancementBlemishSlider">Blemish / Spot Removal:</label>
+                <span class="range-val" id="enhancementBlemishVal">25%</span>
+              </div>
+              <input type="range" id="enhancementBlemishSlider" min="0" max="100" step="1" value="25">
+            </div>
+
+            <!-- Sharpening Slider -->
+            <div class="enhancement-row">
+              <div class="slider-header">
+                <label for="enhancementSharpeningSlider">Sharpening & Clarity:</label>
+                <span class="range-val" id="enhancementSharpeningVal">20%</span>
+              </div>
+              <input type="range" id="enhancementSharpeningSlider" min="0" max="100" step="1" value="20">
+            </div>
+
+            <!-- Quick Presets -->
+            <div class="enhancement-presets-row">
+              <button type="button" class="preset-btn" data-preset="natural">Natural</button>
+              <button type="button" class="preset-btn" data-preset="studio">Studio Glow</button>
+              <button type="button" class="preset-btn" data-preset="crisp">Crisp Detail</button>
+              <button type="button" class="preset-btn reset-preset-btn" id="btnResetEnhancement">Reset</button>
+            </div>
+
+            <!-- Before / After Preview Controls -->
+            <div class="compare-actions-bar">
+              <button type="button" class="btn-compare-hold" id="btnCompareHold" title="Click and hold to preview original unenhanced face">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+                <span>Hold for Before</span>
+              </button>
+              <button type="button" class="btn-compare-toggle" id="btnCompareToggle">
+                <span>Split Compare</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 7: Export / Download Panel -->
         <div class="panel-card export-card hidden" id="exportCard">
           <div class="card-header">
             <h3>Export Passport</h3>
-            <span class="step-badge">STEP 6 & 7</span>
+            <span class="step-badge">STEP 7</span>
           </div>
           <button type="button" class="btn-primary btn-download-panel" id="downloadPanelBtn">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -437,6 +531,7 @@
                   <!-- Live synchronizing canvas: draws the exact cropped pixels in real-time -->
                   <canvas id="passportPreviewCanvas" class="passport-preview-canvas"></canvas>
                   <div class="eraser-brush-cursor hidden" id="eraserBrushCursor"></div>
+                  <div class="enhancement-compare-tag hidden" id="enhancementCompareTag">BEFORE</div>
                   <div class="passport-spec-tag" id="passportSpecTag">Standard 35×45 mm</div>
                 </div>
               </div>
@@ -489,6 +584,6 @@
     </main>
   </div>
 
-  <script src="app.js?v=5"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

@@ -59,7 +59,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnEraserReset = document.getElementById("btnEraserReset");
   const eraserBrushCursor = document.getElementById("eraserBrushCursor");
 
-  // Step 6 & 7: Export Panels & Buttons
+  // Step 6: Face Enhancement Elements
+  const faceEnhancementCard = document.getElementById("faceEnhancementCard");
+  const toggleEnhancement = document.getElementById("toggleEnhancement");
+  const enhancementStatusLabel = document.getElementById("enhancementStatusLabel");
+  const enhancementBody = document.getElementById("enhancementBody");
+  const enhancementStrengthSlider = document.getElementById("enhancementStrengthSlider");
+  const enhancementStrengthVal = document.getElementById("enhancementStrengthVal");
+  const enhancementLightingSlider = document.getElementById("enhancementLightingSlider");
+  const enhancementLightingVal = document.getElementById("enhancementLightingVal");
+  const enhancementSmoothingSlider = document.getElementById("enhancementSmoothingSlider");
+  const enhancementSmoothingVal = document.getElementById("enhancementSmoothingVal");
+  const enhancementBlemishSlider = document.getElementById("enhancementBlemishSlider");
+  const enhancementBlemishVal = document.getElementById("enhancementBlemishVal");
+  const enhancementSharpeningSlider = document.getElementById("enhancementSharpeningSlider");
+  const enhancementSharpeningVal = document.getElementById("enhancementSharpeningVal");
+  const presetBtns = document.querySelectorAll(".preset-btn[data-preset]");
+  const btnResetEnhancement = document.getElementById("btnResetEnhancement");
+  const btnCompareHold = document.getElementById("btnCompareHold");
+  const btnCompareToggle = document.getElementById("btnCompareToggle");
+  const enhancementCompareTag = document.getElementById("enhancementCompareTag");
+
+  // Step 7: Export Panels & Buttons
   const exportCard = document.getElementById("exportCard");
   const downloadPanelBtn = document.getElementById("downloadPanelBtn");
   const downloadBtn = document.getElementById("downloadBtn");
@@ -154,7 +175,19 @@ document.addEventListener("DOMContentLoaded", () => {
     subjectCanvas: null,
     subjectCtx: null,
     undoStack: [],
-    redoStack: []
+    redoStack: [],
+
+    // Step 6: Face Enhancement State (UI & Instant Preview Architecture)
+    faceEnhancement: {
+      enabled: false,
+      strength: 50,
+      lighting: 10,
+      smoothing: 35,
+      blemish: 25,
+      sharpening: 20,
+      compareMode: false,
+      splitCompare: false
+    }
   };
 
   // --- 1. File Upload & Drag-and-Drop ---
@@ -281,6 +314,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Show Workflow Steps
       cropControlsCard.classList.remove("hidden");
       backgroundChoiceCard.classList.remove("hidden");
+      if (faceEnhancementCard) faceEnhancementCard.classList.remove("hidden");
       exportCard.classList.remove("hidden");
       cropOverlayWrapper.classList.remove("hidden");
 
@@ -608,6 +642,10 @@ document.addEventListener("DOMContentLoaded", () => {
     targetCtx.fillRect(0, 0, w, h);
   }
 
+  // Offscreen buffer canvas for zero-flicker composite rendering
+  const baseCanvas = document.createElement("canvas");
+  const baseCtx = baseCanvas.getContext("2d");
+
   // --- LIVE SYNCHRONIZED PASSPORT PREVIEW RENDERING (<0.5 ms) ---
   function updateLivePassportPreview() {
     if (!passportPreviewCanvas || !imgOriginal || !imgOriginal.complete) return;
@@ -628,26 +666,95 @@ document.addEventListener("DOMContentLoaded", () => {
       passportPreviewCanvas.width = srcW;
       passportPreviewCanvas.height = srcH;
     }
+    if (baseCanvas.width !== srcW || baseCanvas.height !== srcH) {
+      baseCanvas.width = srcW;
+      baseCanvas.height = srcH;
+    }
 
+    baseCtx.clearRect(0, 0, srcW, srcH);
+
+    // 1. Render Base Layer into offscreen baseCanvas
+    if (memoryCache.bgMode === "original" || !memoryCache.transparentSubjectImg) {
+      baseCtx.drawImage(imgOriginal, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+    } else {
+      const targetColor = getActiveBgColor();
+      if (targetColor === "transparent") {
+        drawCheckerboard(baseCtx, srcW, srcH);
+      } else {
+        if (memoryCache.activeBgChoice === "custom" && memoryCache.activeCustomOpacity < 100) {
+          drawCheckerboard(baseCtx, srcW, srcH);
+        }
+        baseCtx.fillStyle = targetColor;
+        baseCtx.fillRect(0, 0, srcW, srcH);
+      }
+      baseCtx.drawImage(memoryCache.transparentSubjectImg, 0, 0, srcW, srcH);
+    }
+
+    // 2. Render onto passportPreviewCanvas with Face Enhancement Preview Architecture
     const ctx = passportPreviewCanvas.getContext("2d");
     ctx.clearRect(0, 0, srcW, srcH);
 
-    // Mode A: Keep Original Background (Default)
-    if (memoryCache.bgMode === "original" || !memoryCache.transparentSubjectImg) {
-      ctx.drawImage(imgOriginal, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+    const fe = memoryCache.faceEnhancement;
+
+    if (!fe.enabled || fe.compareMode) {
+      // Unenhanced state (or user holding "Hold for Before" comparison button)
+      ctx.drawImage(baseCanvas, 0, 0);
     } else {
-      // Mode B: Studio Background Color Replacement
-      const targetColor = getActiveBgColor();
-      if (targetColor === "transparent") {
-        drawCheckerboard(ctx, srcW, srcH);
+      // Compute enhancement filter string for instant smooth client-side preview
+      const master = fe.strength / 100;
+      const brightness = (1 + (fe.lighting / 100) * 0.35 * master).toFixed(3);
+      const contrast = (1 + (fe.sharpening / 100) * 0.25 * master).toFixed(3);
+      const saturate = (1 + master * 0.08).toFixed(3);
+      const filterStr = `brightness(${brightness}) contrast(${contrast}) saturate(${saturate})`;
+
+      if (fe.splitCompare) {
+        // Left Half: Before (Unenhanced)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(0, 0, Math.floor(srcW / 2), srcH);
+        ctx.clip();
+        ctx.drawImage(baseCanvas, 0, 0);
+        ctx.restore();
+
+        // Right Half: After (Enhanced Preview)
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(Math.floor(srcW / 2), 0, Math.ceil(srcW / 2), srcH);
+        ctx.clip();
+        ctx.filter = filterStr;
+        ctx.drawImage(baseCanvas, 0, 0);
+        ctx.restore();
+
+        // Split divider vertical guideline
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+        ctx.lineWidth = Math.max(2, Math.round(srcW * 0.003));
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath();
+        ctx.moveTo(Math.floor(srcW / 2), 0);
+        ctx.lineTo(Math.floor(srcW / 2), srcH);
+        ctx.stroke();
+        ctx.restore();
       } else {
-        if (memoryCache.activeBgChoice === "custom" && memoryCache.activeCustomOpacity < 100) {
-          drawCheckerboard(ctx, srcW, srcH);
-        }
-        ctx.fillStyle = targetColor;
-        ctx.fillRect(0, 0, srcW, srcH);
+        // Full frame enhancement preview
+        ctx.save();
+        ctx.filter = filterStr;
+        ctx.drawImage(baseCanvas, 0, 0);
+        ctx.restore();
       }
-      ctx.drawImage(memoryCache.transparentSubjectImg, 0, 0, srcW, srcH);
+    }
+
+    // Update Comparison Badge state on preview card
+    if (enhancementCompareTag) {
+      if (fe.enabled && fe.compareMode) {
+        enhancementCompareTag.textContent = "BEFORE";
+        enhancementCompareTag.classList.remove("hidden");
+      } else if (fe.enabled && fe.splitCompare) {
+        enhancementCompareTag.textContent = "SPLIT COMPARE";
+        enhancementCompareTag.classList.remove("hidden");
+      } else {
+        enhancementCompareTag.classList.add("hidden");
+      }
     }
 
     // Telemetry updates
@@ -1157,7 +1264,159 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // --- Step 6 & 7: Full Resolution Download / Export ---
+  // --- Step 6: Face Enhancement Controls & Preview Architecture ---
+  const ENHANCEMENT_PRESETS = {
+    natural: { strength: 40, lighting: 5, smoothing: 25, blemish: 20, sharpening: 15 },
+    studio: { strength: 65, lighting: 15, smoothing: 50, blemish: 40, sharpening: 25 },
+    crisp: { strength: 75, lighting: 10, smoothing: 30, blemish: 30, sharpening: 50 },
+    reset: { strength: 50, lighting: 10, smoothing: 35, blemish: 25, sharpening: 20 }
+  };
+
+  if (toggleEnhancement) {
+    toggleEnhancement.addEventListener("change", (e) => {
+      const isEnabled = e.target.checked;
+      memoryCache.faceEnhancement.enabled = isEnabled;
+      if (isEnabled) {
+        enhancementBody.classList.remove("disabled-panel");
+        enhancementStatusLabel.textContent = "Enhancement Active";
+      } else {
+        enhancementBody.classList.add("disabled-panel");
+        enhancementStatusLabel.textContent = "Enhancement Disabled";
+        memoryCache.faceEnhancement.compareMode = false;
+        memoryCache.faceEnhancement.splitCompare = false;
+        if (btnCompareToggle) btnCompareToggle.classList.remove("active");
+        if (btnCompareHold) btnCompareHold.classList.remove("active");
+      }
+      updateLivePassportPreview();
+    });
+  }
+
+  // Slider event listeners for instant, smooth client-side preview
+  if (enhancementStrengthSlider) {
+    enhancementStrengthSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.faceEnhancement.strength = val;
+      if (enhancementStrengthVal) enhancementStrengthVal.textContent = `${val}%`;
+      updateLivePassportPreview();
+    });
+  }
+
+  if (enhancementLightingSlider) {
+    enhancementLightingSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.faceEnhancement.lighting = val;
+      if (enhancementLightingVal) enhancementLightingVal.textContent = `${val > 0 ? "+" : ""}${val}%`;
+      updateLivePassportPreview();
+    });
+  }
+
+  if (enhancementSmoothingSlider) {
+    enhancementSmoothingSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.faceEnhancement.smoothing = val;
+      if (enhancementSmoothingVal) enhancementSmoothingVal.textContent = `${val}%`;
+      updateLivePassportPreview();
+    });
+  }
+
+  if (enhancementBlemishSlider) {
+    enhancementBlemishSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.faceEnhancement.blemish = val;
+      if (enhancementBlemishVal) enhancementBlemishVal.textContent = `${val}%`;
+      updateLivePassportPreview();
+    });
+  }
+
+  if (enhancementSharpeningSlider) {
+    enhancementSharpeningSlider.addEventListener("input", (e) => {
+      const val = parseInt(e.target.value, 10);
+      memoryCache.faceEnhancement.sharpening = val;
+      if (enhancementSharpeningVal) enhancementSharpeningVal.textContent = `${val}%`;
+      updateLivePassportPreview();
+    });
+  }
+
+  // Preset Buttons
+  function applyEnhancementPreset(params) {
+    if (!params) return;
+    memoryCache.faceEnhancement.strength = params.strength;
+    memoryCache.faceEnhancement.lighting = params.lighting;
+    memoryCache.faceEnhancement.smoothing = params.smoothing;
+    memoryCache.faceEnhancement.blemish = params.blemish;
+    memoryCache.faceEnhancement.sharpening = params.sharpening;
+
+    if (enhancementStrengthSlider) {
+      enhancementStrengthSlider.value = params.strength;
+      if (enhancementStrengthVal) enhancementStrengthVal.textContent = `${params.strength}%`;
+    }
+    if (enhancementLightingSlider) {
+      enhancementLightingSlider.value = params.lighting;
+      if (enhancementLightingVal) enhancementLightingVal.textContent = `${params.lighting > 0 ? "+" : ""}${params.lighting}%`;
+    }
+    if (enhancementSmoothingSlider) {
+      enhancementSmoothingSlider.value = params.smoothing;
+      if (enhancementSmoothingVal) enhancementSmoothingVal.textContent = `${params.smoothing}%`;
+    }
+    if (enhancementBlemishSlider) {
+      enhancementBlemishSlider.value = params.blemish;
+      if (enhancementBlemishVal) enhancementBlemishVal.textContent = `${params.blemish}%`;
+    }
+    if (enhancementSharpeningSlider) {
+      enhancementSharpeningSlider.value = params.sharpening;
+      if (enhancementSharpeningVal) enhancementSharpeningVal.textContent = `${params.sharpening}%`;
+    }
+    updateLivePassportPreview();
+  }
+
+  presetBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const pKey = btn.getAttribute("data-preset");
+      if (ENHANCEMENT_PRESETS[pKey]) {
+        applyEnhancementPreset(ENHANCEMENT_PRESETS[pKey]);
+      }
+    });
+  });
+
+  if (btnResetEnhancement) {
+    btnResetEnhancement.addEventListener("click", () => {
+      applyEnhancementPreset(ENHANCEMENT_PRESETS.reset);
+    });
+  }
+
+  // Before / After Compare Controls
+  if (btnCompareHold) {
+    const startCompare = (e) => {
+      if (!memoryCache.faceEnhancement.enabled) return;
+      e.preventDefault();
+      memoryCache.faceEnhancement.compareMode = true;
+      btnCompareHold.classList.add("active");
+      updateLivePassportPreview();
+    };
+    const endCompare = (e) => {
+      if (!memoryCache.faceEnhancement.compareMode) return;
+      e.preventDefault();
+      memoryCache.faceEnhancement.compareMode = false;
+      btnCompareHold.classList.remove("active");
+      updateLivePassportPreview();
+    };
+
+    btnCompareHold.addEventListener("pointerdown", startCompare);
+    btnCompareHold.addEventListener("pointerup", endCompare);
+    btnCompareHold.addEventListener("pointercancel", endCompare);
+    btnCompareHold.addEventListener("mouseleave", endCompare);
+  }
+
+  if (btnCompareToggle) {
+    btnCompareToggle.addEventListener("click", () => {
+      if (!memoryCache.faceEnhancement.enabled) return;
+      memoryCache.faceEnhancement.splitCompare = !memoryCache.faceEnhancement.splitCompare;
+      btnCompareToggle.classList.toggle("active", memoryCache.faceEnhancement.splitCompare);
+      updateLivePassportPreview();
+    });
+  }
+
+  // --- Step 7: Full Resolution Download / Export ---
   [downloadBtn, downloadPanelBtn].forEach((btn) => {
     if (!btn) return;
     btn.addEventListener("click", async () => {
@@ -1330,10 +1589,30 @@ document.addEventListener("DOMContentLoaded", () => {
     personSelectCard.classList.add("hidden");
     cropControlsCard.classList.add("hidden");
     backgroundChoiceCard.classList.add("hidden");
+    if (faceEnhancementCard) faceEnhancementCard.classList.add("hidden");
     exportCard.classList.add("hidden");
     methodBanner.classList.add("hidden");
     debugCard.classList.add("hidden");
     downloadBtn.classList.add("disabled");
+
+    // Reset enhancement state
+    if (toggleEnhancement) toggleEnhancement.checked = false;
+    if (enhancementStatusLabel) enhancementStatusLabel.textContent = "Enhancement Disabled";
+    if (enhancementBody) enhancementBody.classList.add("disabled-panel");
+    if (btnCompareToggle) btnCompareToggle.classList.remove("active");
+    if (btnCompareHold) btnCompareHold.classList.remove("active");
+    if (enhancementCompareTag) enhancementCompareTag.classList.add("hidden");
+    memoryCache.faceEnhancement = {
+      enabled: false,
+      strength: 50,
+      lighting: 10,
+      smoothing: 35,
+      blemish: 25,
+      sharpening: 20,
+      compareMode: false,
+      splitCompare: false
+    };
+    applyEnhancementPreset(ENHANCEMENT_PRESETS.reset);
 
     imgOriginal.src = "";
     faceOverlaysContainer.innerHTML = "";

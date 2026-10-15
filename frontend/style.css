@@ -707,6 +707,269 @@ input[type="text"]#colorHexInput {
   cursor: crosshair;
 }
 
+/* Face Enhancement Section (Step 6) */
+.enhancement-card {
+  border-color: rgba(163, 113, 247, 0.35);
+  background: rgba(163, 113, 247, 0.04);
+}
+
+.enhancement-card .card-header .step-badge {
+  background: rgba(163, 113, 247, 0.15);
+  color: #d2a8ff;
+  border-color: rgba(163, 113, 247, 0.4);
+}
+
+.enhancement-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 10px 0;
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 8px;
+}
+
+/* Modern Toggle Switch */
+.switch-control {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.switch-control input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #21262d;
+  border: 1px solid var(--border-color);
+  transition: all 0.25s ease;
+  border-radius: 20px;
+}
+
+.switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 2px;
+  bottom: 2px;
+  background-color: #8b949e;
+  transition: all 0.25s ease;
+  border-radius: 50%;
+}
+
+.switch-control input:checked + .switch-slider {
+  background: linear-gradient(135deg, #8957e5 0%, #a371f7 100%);
+  border-color: #bc8cff;
+}
+
+.switch-control input:checked + .switch-slider:before {
+  transform: translateX(18px);
+  background-color: #ffffff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.4);
+}
+
+.toggle-status-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  transition: color 0.2s ease;
+}
+
+.toggle-status-label.active {
+  color: #d2a8ff;
+}
+
+.enhancement-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+}
+
+.enhancement-body.disabled-panel {
+  opacity: 0.35;
+  pointer-events: none;
+  filter: grayscale(40%);
+}
+
+.enhancement-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.enhancement-row.master-row {
+  background: rgba(163, 113, 247, 0.08);
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(163, 113, 247, 0.2);
+  margin-bottom: 2px;
+}
+
+.enhancement-row .slider-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.enhancement-row .slider-header label {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.enhancement-row.master-row .slider-header label {
+  font-weight: 700;
+  color: #d2a8ff;
+}
+
+.range-val.highlight-val {
+  color: #d2a8ff;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+
+/* Enhancement Quick Presets */
+.enhancement-presets-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.preset-btn {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.64rem;
+  font-weight: 600;
+  padding: 4px 2px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.preset-btn:hover {
+  background: rgba(163, 113, 247, 0.12);
+  border-color: #a371f7;
+  color: #ffffff;
+}
+
+.preset-btn.active {
+  background: rgba(163, 113, 247, 0.2);
+  border-color: #bc8cff;
+  color: #d2a8ff;
+  font-weight: 700;
+}
+
+.preset-btn.reset-preset-btn:hover {
+  border-color: #f85149;
+  color: #ff7b72;
+  background: rgba(248, 81, 73, 0.1);
+}
+
+/* Compare Actions Bar */
+.compare-actions-bar {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn-compare-hold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  user-select: none;
+  touch-action: none;
+  transition: all 0.15s ease;
+}
+
+.btn-compare-hold:hover {
+  border-color: #58a6ff;
+  background: rgba(88, 166, 255, 0.08);
+}
+
+.btn-compare-hold:active, .btn-compare-hold.holding {
+  background: #d97706;
+  border-color: #f59e0b;
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+}
+
+.btn-compare-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-compare-toggle:hover {
+  border-color: #58a6ff;
+  color: var(--text-main);
+}
+
+.btn-compare-toggle.active {
+  background: rgba(88, 166, 255, 0.18);
+  border-color: #58a6ff;
+  color: #58a6ff;
+  font-weight: 700;
+}
+
+/* Compare indicator pill badge on passport preview */
+.enhancement-compare-tag {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: #d97706;
+  color: #ffffff;
+  font-size: 0.62rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+  z-index: 10;
+  animation: pulse-amber 1.5s infinite;
+}
+
+@keyframes pulse-amber {
+  0%, 100% { opacity: 0.9; }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
 /* Debug Telemetry */
 .debug-body {
   margin-top: 8px;
