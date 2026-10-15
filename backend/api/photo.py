@@ -19,6 +19,7 @@ from backend.services.birefnet_portrait import get_birefnet_remover
 from backend.services.mediapipe_segmentation import get_mediapipe_segmentor
 from backend.services.mask_refinement import refine_hybrid_mask, evaluate_mask_quality
 from backend.services.image_compositor import composite_studio_background
+from backend.services.face_detection import get_face_detector
 from backend.utils.image_ops import validate_image_file, load_and_preprocess_image, resize_if_needed
 
 logger = logging.getLogger(__name__)
@@ -201,6 +202,23 @@ async def process_background(
     original_preview_data_url = to_base64_data_url(preview_img)
     mask_preview_data_url = to_base64_data_url(preview_mask)
 
+    # 7.5 Primary Face Detection (Task 1: Face Detection Only)
+    t_face_start = time.time()
+    try:
+        face_detector = get_face_detector()
+        face_info = face_detector.detect_primary_face(preview_img, original_size=original_size)
+    except Exception as e:
+        logger.warning(f"Face detection non-fatal error: {e}")
+        face_info = {
+            "detected": False,
+            "status": "No face detected",
+            "confidence": 0.0,
+            "bounding_box": None,
+            "landmarks": None,
+            "face_count": 0,
+            "inference_time_ms": int((time.time() - t_face_start) * 1000)
+        }
+
     # 8. Store Session in Memory Cache for Instant Full-Resolution Export
     SESSION_CACHE[session_id] = {
         "original_path": input_filepath,
@@ -210,6 +228,7 @@ async def process_background(
         "preview_size": preview_img.size,
         "method": selected_method,
         "bg_analysis": bg_analysis,
+        "face_detection": face_info,
         "timestamp": time.time()
     }
 
@@ -240,11 +259,13 @@ async def process_background(
                 "analysis": bg_analysis
             },
             "quality": quality_eval,
+            "face_detection": face_info,
             "timings": {
                 "preprocessing_ms": t_pre_ms,
                 "analysis_ms": t_analysis_ms,
                 "segmentation_ms": t_seg_ms,
                 "mask_refinement_ms": t_refine_ms,
+                "face_detection_ms": face_info.get("inference_time_ms", 0),
                 "total_ms": total_time_ms,
             },
             "previews": {
@@ -471,3 +492,31 @@ async def download_file(filename: str):
         raise HTTPException(status_code=404, detail="File not found")
 
     return FileResponse(path=target_path, filename=safe_name, media_type="image/png")
+
+
+@router.post("/detect-face")
+async def detect_face_endpoint(session_id: str = Form(...)):
+    """
+    TASK 1: Dedicated face-detection endpoint.
+    Zero background removal re-run. Uses the existing session's processed image.
+    """
+    session = SESSION_CACHE.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session expired or not found. Please upload/process a photo first.")
+
+    # Return cached face detection if already performed
+    if "face_detection" in session and session["face_detection"].get("detected") is not None:
+        return JSONResponse(content={"success": True, "session_id": session_id, **session["face_detection"]})
+
+    orig_path = session.get("original_path")
+    if not orig_path or not Path(orig_path).exists():
+        raise HTTPException(status_code=404, detail="Original photo not found on disk.")
+
+    from PIL import ImageOps
+    orig_img = Image.open(orig_path)
+    orig_img = ImageOps.exif_transpose(orig_img)
+    detector = get_face_detector()
+    face_info = detector.detect_primary_face(orig_img, original_size=session.get("original_size"))
+    session["face_detection"] = face_info
+
+    return JSONResponse(content={"success": True, "session_id": session_id, **face_info})

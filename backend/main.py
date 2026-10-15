@@ -29,6 +29,13 @@ async def lifespan(app: FastAPI):
         logger.info("MediaPipe fast model pre-loaded and ready for instant CPU inference.")
     except Exception as e:
         logger.warning(f"MediaPipe warm-up deferred or failed: {e}. Will initialize on first request.")
+
+    try:
+        from backend.services.face_detection import get_face_detector
+        get_face_detector()
+        logger.info("YuNet face detector pre-loaded and ready for instant CPU inference.")
+    except Exception as e:
+        logger.warning(f"Face detector warm-up deferred: {e}.")
     yield
     logger.info("Snap2Print shutting down.")
 
