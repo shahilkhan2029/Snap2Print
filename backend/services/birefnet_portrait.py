@@ -15,7 +15,7 @@ from typing import Tuple, Dict, Any, Optional
 from PIL import Image
 import numpy as np
 
-from backend.config import MODELS_DIR
+from backend.config import MODELS_DIR, get_model_file
 
 logger = logging.getLogger(__name__)
 
@@ -36,14 +36,18 @@ class BiRefNetPortraitBackend:
 
     def _initialize_session(self):
         try:
-            os.environ["U2NET_HOME"] = str(MODELS_DIR)
+            biref_path = get_model_file(f"models/{self.model_name}/{self.model_name}.onnx")
+            if biref_path.exists():
+                os.environ["U2NET_HOME"] = str(biref_path.parent.parent.parent)
+            else:
+                os.environ["U2NET_HOME"] = str(MODELS_DIR)
             import rembg
             import onnxruntime as ort
             sess_opts = ort.SessionOptions()
-            cpu_count = os.cpu_count() or 4
+            cpu_count = min(os.cpu_count() or 4, 4)
             sess_opts.intra_op_num_threads = cpu_count
-            sess_opts.inter_op_num_threads = 2
-            sess_opts.execution_mode = ort.ExecutionMode.ORT_PARALLEL
+            sess_opts.inter_op_num_threads = 1
+            sess_opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
             sess_opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
             logger.info(f"Initializing persistent BiRefNet-Portrait session (threads={cpu_count})...")

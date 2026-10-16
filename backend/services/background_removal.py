@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Dict, Any
 from PIL import Image
 import numpy as np
 
-from backend.config import DEFAULT_BG_MODEL, MODELS_DIR
+from backend.config import DEFAULT_BG_MODEL, MODELS_DIR, get_model_file
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,11 @@ class RembgU2NetPBackend(BaseBackgroundRemover):
 
     def _initialize_session(self):
         try:
-            os.environ["U2NET_HOME"] = str(MODELS_DIR)
+            u2net_path = get_model_file(f"models/{self.model_name}/{self.model_name}.onnx")
+            if u2net_path.exists():
+                os.environ["U2NET_HOME"] = str(u2net_path.parent.parent.parent)
+            else:
+                os.environ["U2NET_HOME"] = str(MODELS_DIR)
             import rembg
 
             logger.info(f"Initializing singleton background removal session with model: '{self.model_name}'...")

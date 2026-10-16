@@ -6,6 +6,21 @@ Snap2Print is an offline-capable, CPU-optimized desktop web application designed
 
 ---
 
+## 📥 Instant Download (Windows Standalone App)
+
+**No Python, terminal, or setup required!** Non-technical users can run Snap2Print directly:
+
+👉 **[Download Latest Release (Snap2Print-Windows-v1.0.0.zip)](https://github.com/shahilkhan2029/Snap2Print/releases/latest/download/Snap2Print-Windows-v1.0.0.zip)**
+
+### How to Run:
+1. **Download & Extract**: Download `Snap2Print-Windows-v1.0.0.zip` and extract it anywhere on your PC (`Right-click -> Extract All...`).
+2. **Launch**: Open the extracted folder and double-click **`Snap2Print.exe`**.
+3. **Use**: The app automatically boots the local AI engine and opens your default browser at `http://127.0.0.1:8000`.
+
+*(Note: If Windows SmartScreen displays "Windows protected your PC", click **More info** $\rightarrow$ **Run anyway**).*
+
+---
+
 ## 🌟 The Problem Snap2Print Solves
 
 Small photo studio operators and print shops process dozens of customer passport and visa photos daily. In traditional workflows:

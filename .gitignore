@@ -19,6 +19,12 @@ __pycache__/
 htmlcov/
 .tox/
 
+# Packaging & Build Outputs (Standalone executables and compiler caches)
+build/
+dist/
+*.egg-info/
+*.zip
+
 # Local Storage & Runtime User Session Data
 # (Ensures zero customer photos, segmented masks, or exports are committed)
 input/*

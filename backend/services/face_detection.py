@@ -25,7 +25,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
-from backend.config import MODELS_DIR
+from backend.config import MODELS_DIR, get_model_file
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,7 @@ class FaceDetectionService:
     """
 
     def __init__(self, model_path: Optional[Path] = None):
-        self.model_path = model_path or (MODELS_DIR / YUNET_MODEL_FILENAME)
+        self.model_path = model_path or get_model_file(YUNET_MODEL_FILENAME)
         self.detector = None
         self._ensure_model_file()
         self._initialize()
